@@ -219,6 +219,8 @@ export interface WorkerTelegramContext {
     question: string,
     emoji?: string,
   ) => Promise<number>;
+  /** Send a photo to Telegram */
+  sendPhoto: (chatId: number, photoPath: string, caption?: string) => Promise<number>;
   /** Track which worker sent which Telegram message (for reply routing) */
   trackMessage: (telegramMsgId: number, workerId: number) => void;
 }
@@ -737,6 +739,24 @@ export class WorkerLLM {
       resultText = await this.callHaiku(result.result, RESULT_INSTRUCTION, result.result, "result formatter");
     } else {
       resultText = result.subtype === "success" ? "(no output)" : `Error: ${result.subtype}`;
+    }
+
+    // Extract and send [IMAGE: /path] markers from worker output
+    const rawOutput = (result.subtype === "success" && result.result) ? result.result : "";
+    const imageMarkers = rawOutput.matchAll(/\[IMAGE:\s*([^\]]+)\]/g);
+    for (const match of imageMarkers) {
+      const imagePath = match[1].trim();
+      if (existsSync(imagePath)) {
+        try {
+          const msgId = await this.telegramCtx.sendPhoto(this.telegramCtx.chatId, imagePath);
+          this.telegramCtx.trackMessage(msgId, this.id);
+          log.info({ workerId: this.id, imagePath }, "Auto-sent image from worker output");
+        } catch (err) {
+          log.error({ err, workerId: this.id, imagePath }, "Failed to auto-send image");
+        }
+      } else {
+        log.warn({ workerId: this.id, imagePath }, "Image marker path does not exist");
+      }
     }
 
     const text = `${this.telegramCtx.emoji} #${this.id} done — $${cost}\n\n${resultText}`;

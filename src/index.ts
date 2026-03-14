@@ -69,6 +69,7 @@ async function main() {
     },
     sendLongMessage: (chatId, text) => sendLongMessage(chatId, text),
     sendQuestionMessage,
+    sendPhoto: (chatId, photoPath, caption) => sendPhoto(chatId, photoPath, caption),
   });
 
   // 6. Start token refresh loop (keeps OAuth token fresh)

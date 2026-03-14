@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#0f0f1a"/>
+    </linearGradient>
+    <linearGradient id="fireGrad" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#ff4500"/>
+      <stop offset="40%" stop-color="#ff6b00"/>
+      <stop offset="100%" stop-color="#ffd700"/>
+    </linearGradient>
+    <linearGradient id="anvilGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8a8a9a"/>
+      <stop offset="100%" stop-color="#4a4a5a"/>
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#ff4500" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ff4500" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="256" fill="url(#bgGrad)"/>
+
+  <!-- Subtle glow behind anvil -->
+  <ellipse cx="256" cy="340" rx="140" ry="80" fill="url(#glowGrad)"/>
+
+  <!-- Anvil body -->
+  <path d="M160 310 L180 280 L332 280 L352 310 L370 310 L370 340 L142 340 L142 310 Z" fill="url(#anvilGrad)" stroke="#2a2a3a" stroke-width="3"/>
+  <!-- Anvil horn -->
+  <path d="M332 280 L390 290 L370 310 L352 310 Z" fill="#7a7a8a" stroke="#2a2a3a" stroke-width="3"/>
+  <!-- Anvil base -->
+  <rect x="170" y="340" width="172" height="30" rx="4" fill="#3a3a4a" stroke="#2a2a3a" stroke-width="3"/>
+  <rect x="190" y="370" width="132" height="25" rx="4" fill="#2a2a3a" stroke="#1a1a2a" stroke-width="3"/>
+
+  <!-- Central flame (large) -->
+  <path d="M256 120 C256 120 220 180 220 220 C220 240 230 260 256 270 C282 260 292 240 292 220 C292 180 256 120 256 120 Z" fill="url(#fireGrad)"/>
+  <!-- Inner flame bright core -->
+  <path d="M256 160 C256 160 240 195 240 220 C240 235 246 250 256 255 C266 250 272 235 272 220 C272 195 256 160 256 160 Z" fill="#ffe066" opacity="0.9"/>
+
+  <!-- Left flame -->
+  <path d="M200 190 C200 190 180 220 183 245 C186 260 195 272 210 275 C220 268 224 255 222 240 C218 215 200 190 200 190 Z" fill="url(#fireGrad)" opacity="0.8"/>
+
+  <!-- Right flame -->
+  <path d="M312 190 C312 190 332 220 329 245 C326 260 317 272 302 275 C292 268 288 255 290 240 C294 215 312 190 312 190 Z" fill="url(#fireGrad)" opacity="0.8"/>
+
+  <!-- Sparks -->
+  <circle cx="210" cy="170" r="4" fill="#ffd700" opacity="0.9"/>
+  <circle cx="300" cy="160" r="3" fill="#ffd700" opacity="0.8"/>
+  <circle cx="235" cy="140" r="3" fill="#ffaa00" opacity="0.7"/>
+  <circle cx="280" cy="135" r="2.5" fill="#ffd700" opacity="0.85"/>
+  <circle cx="190" cy="200" r="2.5" fill="#ff6b00" opacity="0.6"/>
+  <circle cx="325" cy="195" r="2" fill="#ff6b00" opacity="0.6"/>
+
+  <!-- Hammer silhouette (small, resting on anvil) -->
+  <g transform="translate(256, 275) rotate(-30)">
+    <!-- Hammer handle -->
+    <rect x="-4" y="-70" width="8" height="55" rx="3" fill="#8B4513"/>
+    <!-- Hammer head -->
+    <rect x="-18" y="-82" width="36" height="20" rx="4" fill="#6a6a7a" stroke="#4a4a5a" stroke-width="2"/>
+  </g>
+
+  <!-- "S" letter subtly integrated as forge mark on anvil -->
+  <text x="256" y="328" text-anchor="middle" font-family="Georgia, serif" font-size="32" font-weight="bold" fill="#ff6b00" opacity="0.5">S</text>
+</svg>

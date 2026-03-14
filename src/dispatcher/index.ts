@@ -44,6 +44,7 @@ export interface TelegramFunctions {
     question: string,
     emoji?: string,
   ) => Promise<number>;
+  sendPhoto: (chatId: number, photoPath: string, caption?: string) => Promise<number>;
 }
 
 /**
@@ -197,6 +198,7 @@ export class Dispatcher {
       sendMessage: this.telegramFns.sendMessage,
       sendLongMessage: this.telegramFns.sendLongMessage,
       sendQuestionMessage: this.telegramFns.sendQuestionMessage,
+      sendPhoto: this.telegramFns.sendPhoto,
       trackMessage: (telegramMsgId, workerId) => {
         messageToWorker.set(telegramMsgId, workerId);
       },
