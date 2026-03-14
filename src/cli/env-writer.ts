@@ -54,7 +54,7 @@ export function writeEnvFile(values: EnvValues, envPath = ".env"): void {
   }
 
   // Database
-  if (values.DB_PATH && values.DB_PATH !== "./data/conciergon.db") {
+  if (values.DB_PATH && values.DB_PATH !== "./data/svarog.db") {
     lines.push("# Database path");
     lines.push(`DB_PATH=${values.DB_PATH}`);
     lines.push("");

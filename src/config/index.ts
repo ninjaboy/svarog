@@ -25,7 +25,7 @@ const envSchema = z.object({
     .transform((p) => p.replace(/^~/, homedir())),
   DB_PATH: z
     .string()
-    .default("./data/conciergon.db")
+    .default("./data/svarog.db")
     .transform((p) => resolve(p)),
   WATCHDOG_INTERVAL_MS: z.coerce.number().default(1500),
   WORKER_IDLE_TIMEOUT_S: z.coerce.number().default(300),

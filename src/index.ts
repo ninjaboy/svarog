@@ -4,12 +4,12 @@ import { initDb, closeDb } from "./db/index.js";
 import { scanAndRegisterProjects } from "./utils/project-registry.js";
 import {
   processMessage,
-  startConciergSession,
-  stopConciergSession,
-  pingConciergSession,
-} from "./concierg/index.js";
+  startSvarogSession,
+  stopSvarogSession,
+  pingSvarogSession,
+} from "./svarog/index.js";
 import { Dispatcher, getWorkerIdByTelegramMessage } from "./dispatcher/index.js";
-import { setPoolInfoGetter, setSchedulerRef } from "./concierg/mcp-tools.js";
+import { setPoolInfoGetter, setSchedulerRef } from "./svarog/mcp-tools.js";
 import { Scheduler } from "./scheduler/index.js";
 import { Watchdog } from "./watchdog/index.js";
 import {
@@ -32,7 +32,7 @@ import { createChildLogger } from "./utils/logger.js";
 const log = createChildLogger("main");
 
 async function main() {
-  log.info("Conciergon starting...");
+  log.info("Svarog starting...");
 
   // 1. Load config
   const config = loadConfig();
@@ -50,7 +50,7 @@ async function main() {
   // 5. Init Dispatcher
   const dispatcher = new Dispatcher();
 
-  // Wire pool info getter so concierg's get_system_state shows pool/phase info
+  // Wire pool info getter so svarog's get_system_state shows pool/phase info
   setPoolInfoGetter((workerId) => {
     const session = dispatcher.getPool().get(workerId);
     if (!session) return null;
@@ -74,18 +74,18 @@ async function main() {
   // 6. Start token refresh loop (keeps OAuth token fresh)
   startTokenRefreshLoop();
 
-  // 7. Start Concierg session (Claude Code SDK)
-  await startConciergSession();
+  // 7. Start Svarog session (Claude Code SDK)
+  await startSvarogSession();
 
   // 8. Init Health Monitor
   const health = new HealthMonitor({
     getBot,
     stopBot,
     startBot,
-    pingSession: pingConciergSession,
+    pingSession: pingSvarogSession,
     restartSession: async () => {
-      await stopConciergSession();
-      await startConciergSession();
+      await stopSvarogSession();
+      await startSvarogSession();
     },
     alertChatId: config.TELEGRAM_ALLOWED_USERS[0],
   });
@@ -100,7 +100,7 @@ async function main() {
     await sendPhoto(chatId, photoPath, caption);
   };
 
-  // 9. Wire Telegram -> Concierg -> dispatch intents
+  // 9. Wire Telegram -> Svarog -> dispatch intents
   setMessageHandler(async (text, messageId, chatId, replyToMessageId, replyToText, images) => {
     health.trackMessageStart(messageId);
     sendTypingAction(chatId);
@@ -149,7 +149,7 @@ async function main() {
     scheduler.stop();
     watchdog.stop();
     stopTokenRefreshLoop();
-    await stopConciergSession();
+    await stopSvarogSession();
     await dispatcher.stopAll();
     await stopBot();
     closeDb();
@@ -184,7 +184,7 @@ async function main() {
   // 14. Start health monitor (after bot is polling)
   health.start();
 
-  log.info("Conciergon is running!");
+  log.info("Svarog is running!");
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {
@@ -194,7 +194,7 @@ async function main() {
     scheduler.stop();
     watchdog.stop();
     stopTokenRefreshLoop();
-    await stopConciergSession();
+    await stopSvarogSession();
     await dispatcher.stopAll();
     await stopBot();
     closeDb();

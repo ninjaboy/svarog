@@ -11,10 +11,10 @@ function guardCancel<T>(value: T | symbol): T {
 }
 
 export async function runSetup(): Promise<void> {
-  p.intro("Conciergon Setup");
+  p.intro("Svarog Setup");
 
   p.note(
-    "This wizard will help you configure Conciergon.\n" +
+    "This wizard will help you configure Svarog.\n" +
       "You'll need:\n" +
       "  1. A Telegram bot token (from @BotFather)\n" +
       "  2. Your Telegram user ID\n" +
@@ -98,13 +98,13 @@ export async function runSetup(): Promise<void> {
       p.log.success(`Claude Code CLI found: ${cliCheck.path}`);
       p.note(
         "Make sure you've run `claude login` to authenticate.\n" +
-          "Conciergon will use your OAuth token automatically.",
+          "Svarog will use your OAuth token automatically.",
         "OAuth Authentication"
       );
     } else {
       p.log.warning("Claude Code CLI not found in PATH.");
       p.note(
-        "Install Claude Code CLI and run `claude login` before starting Conciergon.\n" +
+        "Install Claude Code CLI and run `claude login` before starting Svarog.\n" +
           "See: https://docs.anthropic.com/en/docs/claude-code",
         "Action Required"
       );
@@ -145,7 +145,7 @@ export async function runSetup(): Promise<void> {
     }
   } else {
     p.log.warning(dirCheck.error!);
-    p.log.info("You can create this directory later. Conciergon will scan it on startup.");
+    p.log.info("You can create this directory later. Svarog will scan it on startup.");
   }
 
   // ── Step 5: Optional Settings ───────────────────────────────
@@ -220,5 +220,5 @@ export async function runSetup(): Promise<void> {
 
   p.note(summaryLines.join("\n"), "Configuration");
 
-  p.outro("Setup complete! Run `npm run dev` to start Conciergon.");
+  p.outro("Setup complete! Run `npm run dev` to start Svarog.");
 }

@@ -7,11 +7,11 @@ import {
   type SDKMessage,
   type SDKResultMessage,
 } from "@anthropic-ai/claude-code";
-import { getConciergContext } from "../db/queries.js";
+import { getSvarogContext } from "../db/queries.js";
 import { buildCleanEnv } from "../utils/env.js";
 import { createChildLogger } from "../utils/logger.js";
 import {
-  conciergMcpServer,
+  svarogMcpServer,
   setMcpContext,
   clearMcpContext,
   getRegisteredIntents,
@@ -19,9 +19,9 @@ import {
 } from "./mcp-tools.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const WORKSPACE_DIR = join(__dirname, "..", "..", "concierg-workspace");
+const WORKSPACE_DIR = join(__dirname, "..", "..", "svarog-workspace");
 
-const log = createChildLogger("concierg-session");
+const log = createChildLogger("svarog-session");
 
 export interface ImageData {
   base64: string;
@@ -54,12 +54,12 @@ function findClaudeBinary(): string {
 
 const CLAUDE_BINARY = findClaudeBinary();
 
-// --- ConciergSession ---
+// --- SvarogSession ---
 // Uses Claude Code SDK with global claude binary.
 // Supports resume-per-message: each send() spawns a new query() with resume: sessionId.
 // Claude now uses MCP tools to send messages and register intents.
 
-export class ConciergSession {
+export class SvarogSession {
   private pendingEvents: string[] = [];
   private sessionId: string | null = null;
   private alive = false;
@@ -83,12 +83,12 @@ export class ConciergSession {
     if (resumeSessionId) {
       this.sessionId = resumeSessionId;
       this.alive = true;
-      log.info({ sessionId: resumeSessionId }, "Concierg session resumed from DB");
+      log.info({ sessionId: resumeSessionId }, "Svarog session resumed from DB");
       return;
     }
 
     // Bootstrap: run one query to get a session ID
-    log.info("Bootstrapping concierg session");
+    log.info("Bootstrapping svarog session");
     try {
       await this.runQuery(
         "System initialized. Send a greeting message to the user saying you are online and ready.",
@@ -101,9 +101,9 @@ export class ConciergSession {
 
     if (this.sessionId) {
       this.alive = true;
-      log.info({ sessionId: this.sessionId }, "Concierg session bootstrapped");
+      log.info({ sessionId: this.sessionId }, "Svarog session bootstrapped");
     } else {
-      throw new Error("Failed to bootstrap concierg session — no session ID received");
+      throw new Error("Failed to bootstrap svarog session — no session ID received");
     }
   }
 
@@ -118,11 +118,11 @@ export class ConciergSession {
     sendPhotoFn: (chatId: number, photoPath: string, caption?: string) => Promise<void>,
   ): Promise<RegisteredIntent[]> {
     if (!this.sessionId) {
-      throw new Error("Concierg session not initialized");
+      throw new Error("Svarog session not initialized");
     }
 
     if (this.busy) {
-      throw new Error("Concierg session busy — concurrent send not supported");
+      throw new Error("Svarog session busy — concurrent send not supported");
     }
 
     // Keep send functions fresh from every user message
@@ -186,7 +186,7 @@ export class ConciergSession {
   }
 
   async stop(): Promise<void> {
-    log.info("Stopping concierg session");
+    log.info("Stopping svarog session");
     this.alive = false;
   }
 
@@ -210,12 +210,12 @@ export class ConciergSession {
     });
 
     const canUseTool: CanUseTool = async (toolName, _input, _options) => {
-      // Allow Concierg's own MCP tools and Read (for images)
-      if (toolName.startsWith("mcp__concierg__") || toolName === "Read") {
+      // Allow Svarog's own MCP tools and Read (for images)
+      if (toolName.startsWith("mcp__svarog__") || toolName === "Read") {
         return { behavior: "allow" as const, updatedInput: _input };
       }
       // Block everything else with guidance to spawn a worker
-      log.warn({ toolName }, "Concierg attempted to use blocked tool");
+      log.warn({ toolName }, "Svarog attempted to use blocked tool");
       return {
         behavior: "deny" as const,
         message: `STOP. Do NOT use ${toolName}. You are a dispatcher. Spawn a general worker via register_intent(spawn_worker, project="general") and tell the user you're looking into it.`,
@@ -278,10 +278,10 @@ export class ConciergSession {
           "- You do NOT need to relay worker questions or results — workers handle that themselves.",
           "- De-duplicate: if multiple events describe the same thing, send one message",
         ].join("\n"),
-        allowedTools: ["mcp__concierg__*", "Read"],
+        allowedTools: ["mcp__svarog__*", "Read"],
         maxTurns: 200,
         cwd: WORKSPACE_DIR,
-        mcpServers: { concierg: conciergMcpServer },
+        mcpServers: { svarog: svarogMcpServer },
         pathToClaudeCodeExecutable: CLAUDE_BINARY,
         env,
         abortController,
@@ -295,7 +295,7 @@ export class ConciergSession {
         // Capture session ID on init
         if (message.type === "system" && message.subtype === "init") {
           this.sessionId = message.session_id;
-          log.info({ sessionId: message.session_id }, "Concierg session initialized");
+          log.info({ sessionId: message.session_id }, "Svarog session initialized");
         }
 
         // Final result
@@ -303,12 +303,12 @@ export class ConciergSession {
           if (message.subtype === "success") {
             log.info(
               { turns: message.num_turns, cost: message.total_cost_usd.toFixed(4) },
-              "Concierg query completed"
+              "Svarog query completed"
             );
           } else {
             log.warn(
               { subtype: message.subtype, turns: message.num_turns },
-              "Concierg query finished with non-success"
+              "Svarog query finished with non-success"
             );
           }
         }
@@ -331,7 +331,7 @@ export class ConciergSession {
       if (err?.message?.includes("exited with code 1")) {
         log.warn("SDK exited with code 1, continuing with collected intents");
       } else {
-        log.error({ err }, "Concierg query error");
+        log.error({ err }, "Svarog query error");
         // Send user-friendly message instead of throwing
         try {
           if (chatId) {
@@ -368,7 +368,7 @@ export class ConciergSession {
 
     // Reply context
     if (replyToText) {
-      const context = getConciergContext();
+      const context = getSvarogContext();
       const matchingQ = context.pendingQuestions.find(
         (q) => q.telegramMessageId === replyToMessageId
       );

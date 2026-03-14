@@ -76,7 +76,7 @@ export interface AskUserQuestionItem {
   options: AskUserQuestionOption[];
 }
 
-export interface ConciergResponse {
+export interface SvarogResponse {
   type: IntentType;
   project: string | null;
   prompt: string;

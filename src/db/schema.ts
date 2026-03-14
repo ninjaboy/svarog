@@ -57,7 +57,7 @@ export const events = sqliteTable("events", {
     .default(sql`(datetime('now'))`),
 });
 
-export const conciergSessions = sqliteTable("concierg_sessions", {
+export const svarogSessions = sqliteTable("svarog_sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   sessionId: text("session_id").notNull(),
   state: text("state").notNull().default("active"), // active | stopped

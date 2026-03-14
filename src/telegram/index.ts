@@ -4,7 +4,7 @@ import { Api, Bot, Context, InlineKeyboard, InputFile } from "grammy";
 import { getConfig } from "../config/index.js";
 import { createChildLogger } from "../utils/logger.js";
 import { markdownToTelegramHtml, markdownToTelegramChunks, escapeHtml, stripHtmlTags } from "./format.js";
-import type { ImageData } from "../concierg/session.js";
+import type { ImageData } from "../svarog/session.js";
 export type { ImageData };
 
 const log = createChildLogger("telegram");
@@ -276,7 +276,7 @@ export function initTelegramBot(): Bot {
   // /start command
   bot.command("start", async (ctx) => {
     await ctx.reply(
-      "Conciergon active. Send me tasks for your projects.\n" +
+      "Svarog active. Send me tasks for your projects.\n" +
         'Try: "fix the login bug in myapp"'
     );
   });
@@ -290,7 +290,7 @@ export function initTelegramBot(): Bot {
 
   // /restart command
   bot.command("restart", async (ctx) => {
-    await ctx.reply("Restarting conciergon...");
+    await ctx.reply("Restarting svarog...");
     log.info("Restart requested via /restart command");
     if (restartHandler) {
       await restartHandler();

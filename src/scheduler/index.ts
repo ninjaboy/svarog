@@ -1,5 +1,5 @@
 import cron, { type ScheduledTask } from "node-cron";
-import { notifyConcierg } from "../concierg/index.js";
+import { notifySvarog } from "../svarog/index.js";
 import {
   getEnabledScheduledTasks,
   getScheduledTaskById,
@@ -87,8 +87,8 @@ export class Scheduler {
       "Executing scheduled task"
     );
 
-    // Notify user via Concierg
-    notifyConcierg(
+    // Notify user via Svarog
+    notifySvarog(
       `[SCHEDULED | Schedule #${schedule.id} | ${schedule.emoji || "⏰"} | project: ${project.name}] Running: "${schedule.userSummary}"`
     );
 
@@ -128,7 +128,7 @@ export class Scheduler {
       if (updated && updated.errorCount >= updated.maxErrors) {
         updateScheduledTaskEnabled(schedule.id, false);
         this.removeSchedule(schedule.id);
-        notifyConcierg(
+        notifySvarog(
           `[SCHEDULE ERROR | Schedule #${schedule.id}] Disabled after ${updated.errorCount} consecutive failures: "${schedule.userSummary}"`
         );
       }

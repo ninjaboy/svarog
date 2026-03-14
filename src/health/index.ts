@@ -199,12 +199,12 @@ export class HealthMonitor {
 
       // Try to restart the session
       try {
-        log.warn("Restarting concierg session...");
+        log.warn("Restarting svarog session...");
         await this.deps.restartSession();
-        log.info("Concierg session restarted");
+        log.info("Svarog session restarted");
         this.state.sdk.status = "ok";
       } catch (restartErr) {
-        log.error({ err: restartErr }, "Failed to restart concierg session");
+        log.error({ err: restartErr }, "Failed to restart svarog session");
         this.state.sdk.status = "error";
       }
 

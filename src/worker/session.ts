@@ -50,7 +50,7 @@ function findClaudeBinary(): string {
 const CLAUDE_BINARY = findClaudeBinary();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FORMATTER_DIR = join(__dirname, "..", "..", "concierg-workspace", "haiku-formatter");
+const FORMATTER_DIR = join(__dirname, "..", "..", "svarog-workspace", "haiku-formatter");
 
 /** Shared Haiku call for text formatting. No tools allowed — pure text in, text out. */
 async function haikuFormat(

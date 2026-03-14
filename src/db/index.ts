@@ -67,7 +67,7 @@ function createTables(sqlite: Database.Database) {
       data TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
-    `CREATE TABLE IF NOT EXISTS concierg_sessions (
+    `CREATE TABLE IF NOT EXISTS svarog_sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       session_id TEXT NOT NULL,
       state TEXT NOT NULL DEFAULT 'active',

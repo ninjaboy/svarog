@@ -6,7 +6,7 @@ All intents go through `resolveWorkerSession()` — the single path for worker r
 
 ```
 User sends message
-  -> Concierg classifies intent
+  -> Svarog classifies intent
   -> Dispatcher.handleIntent()
      |
      +-- ALL intents (follow_up, switch_to_plan, pause, restore_worker, etc.)

@@ -4,7 +4,7 @@ import { runSetup } from "./setup.js";
 const program = new Command();
 
 program
-  .name("conciergon")
+  .name("svarog")
   .description("Telegram bot that manages Claude Code worker sessions on your projects")
   .version("0.1.0");
 

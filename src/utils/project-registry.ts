@@ -34,7 +34,7 @@ export function scanAndRegisterProjects(): number {
   }
 
   // Register the "general" project so general workers have a valid FK reference
-  const generalWorkerDir = join(process.cwd(), "concierg-workspace", "general-worker");
+  const generalWorkerDir = join(process.cwd(), "svarog-workspace", "general-worker");
   upsertProject("general", generalWorkerDir);
   count++;
 

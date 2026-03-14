@@ -310,39 +310,39 @@ export function getQuestionById(id: number) {
     .get();
 }
 
-// --- Concierg Sessions ---
+// --- Svarog Sessions ---
 
-export function getActiveConciergSessionId(): string | null {
+export function getActiveSvarogSessionId(): string | null {
   const row = getDb()
     .select()
-    .from(schema.conciergSessions)
-    .where(eq(schema.conciergSessions.state, "active"))
-    .orderBy(desc(schema.conciergSessions.id))
+    .from(schema.svarogSessions)
+    .where(eq(schema.svarogSessions.state, "active"))
+    .orderBy(desc(schema.svarogSessions.id))
     .limit(1)
     .get();
   return row?.sessionId ?? null;
 }
 
-export function saveConciergSessionId(sessionId: string) {
+export function saveSvarogSessionId(sessionId: string) {
   const db = getDb();
   // Mark all existing active sessions as stopped
-  db.update(schema.conciergSessions)
+  db.update(schema.svarogSessions)
     .set({ state: "stopped", updatedAt: sql`datetime('now')` })
-    .where(eq(schema.conciergSessions.state, "active"))
+    .where(eq(schema.svarogSessions.state, "active"))
     .run();
   // Insert new active session
   return db
-    .insert(schema.conciergSessions)
+    .insert(schema.svarogSessions)
     .values({ sessionId })
     .returning()
     .get();
 }
 
-export function stopConciergSessions() {
+export function stopSvarogSessions() {
   return getDb()
-    .update(schema.conciergSessions)
+    .update(schema.svarogSessions)
     .set({ state: "stopped", updatedAt: sql`datetime('now')` })
-    .where(eq(schema.conciergSessions.state, "active"))
+    .where(eq(schema.svarogSessions.state, "active"))
     .run();
 }
 
@@ -472,9 +472,9 @@ export function resetScheduleErrorCount(id: number) {
     .run();
 }
 
-// --- Context for Concierg ---
+// --- Context for Svarog ---
 
-export function getConciergContext() {
+export function getSvarogContext() {
   const projectList = getAllProjects();
   const activeWorkerList = getActiveWorkers();
   const recoverableWorkerList = getStoppedRecoverableWorkers();

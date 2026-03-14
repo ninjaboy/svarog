@@ -2,7 +2,7 @@ import { z } from "zod";
 import cron from "node-cron";
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-code";
 import {
-  getConciergContext,
+  getSvarogContext,
   getWorkerRecentMessages,
   getProjectByName,
   insertScheduledTask,
@@ -17,7 +17,7 @@ import { createChildLogger } from "../utils/logger.js";
 
 const log = createChildLogger("mcp-tools");
 
-// --- Per-call context (safe: ConciergSession enforces sequential via `busy`) ---
+// --- Per-call context (safe: SvarogSession enforces sequential via `busy`) ---
 
 export interface RegisteredIntent {
   type: IntentType;
@@ -222,7 +222,7 @@ const getSystemStateTool = tool(
   {},
   async () => {
     try {
-      const context = getConciergContext();
+      const context = getSvarogContext();
 
       const projectNames = context.projects.map((p) => p.name).join(", ");
       const activeWorkers = context.activeWorkers
@@ -459,7 +459,7 @@ const manageScheduleTool = tool(
 
 // --- MCP server ---
 
-export const conciergMcpServer = createSdkMcpServer({
-  name: "concierg",
+export const svarogMcpServer = createSdkMcpServer({
+  name: "svarog",
   tools: [sendTelegramMessageTool, sendTelegramPhotoTool, registerIntentTool, getSystemStateTool, manageScheduleTool],
 });

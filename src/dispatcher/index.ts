@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import { type SDKResultMessage } from "@anthropic-ai/claude-code";
 
-import { notifyConcierg } from "../concierg/index.js";
+import { notifySvarog } from "../svarog/index.js";
 import {
   getActiveWorkers,
   getAllProjects,
@@ -25,7 +25,7 @@ import { WorkerLLM, WorkerPool } from "../worker/index.js";
 import type { WorkerTelegramContext } from "../worker/session.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const GENERAL_WORKER_DIR = join(__dirname, "..", "..", "concierg-workspace", "general-worker");
+const GENERAL_WORKER_DIR = join(__dirname, "..", "..", "svarog-workspace", "general-worker");
 
 const log = createChildLogger("dispatcher");
 
@@ -172,7 +172,7 @@ export class Dispatcher {
           break;
 
         case "status":
-          // Concierg handles status via get_system_state + send_telegram_message
+          // Svarog handles status via get_system_state + send_telegram_message
           break;
 
         case "general":
@@ -183,7 +183,7 @@ export class Dispatcher {
       }
     } catch (err) {
       log.error({ err, intentId: intent.id }, "Error handling intent");
-      notifyConcierg(`[ERROR] Intent processing failed: ${(err as Error).message}`);
+      notifySvarog(`[ERROR] Intent processing failed: ${(err as Error).message}`);
     }
   }
 
@@ -214,7 +214,7 @@ export class Dispatcher {
     planMode: boolean = true,
   ): Promise<void> {
     if (!projectName) {
-      notifyConcierg("[ERROR] No project specified for spawn");
+      notifySvarog("[ERROR] No project specified for spawn");
       return;
     }
 
@@ -226,7 +226,7 @@ export class Dispatcher {
     if (projectName === "general") {
       const generalProject = getProjectByName("general");
       if (!generalProject) {
-        notifyConcierg("[ERROR] General worker project not found in database");
+        notifySvarog("[ERROR] General worker project not found in database");
         return;
       }
       projectPath = GENERAL_WORKER_DIR;
@@ -237,7 +237,7 @@ export class Dispatcher {
       if (!project) {
         const allProjects = getAllProjects();
         const names = allProjects.map((p) => p.name).join(", ");
-        notifyConcierg(`[ERROR] Project "${projectName}" not found. Available: ${names || "(none)"}`);
+        notifySvarog(`[ERROR] Project "${projectName}" not found. Available: ${names || "(none)"}`);
         return;
       }
       projectPath = project.path;
@@ -272,8 +272,8 @@ export class Dispatcher {
 
     this.pool.add(session);
 
-    // Notify user via Concierg
-    notifyConcierg(
+    // Notify user via Svarog
+    notifySvarog(
       `[SPAWN | Worker #${workerRow.id} | ${workerEmoji} | project: ${resolvedProjectName} | mode: ${planMode ? 'plan' : 'default'}] Task: "${userSummary || prompt}"`
     );
 
@@ -281,7 +281,7 @@ export class Dispatcher {
     session.start().catch((err) => {
       log.error({ err, workerId: workerRow.id }, "Worker start failed");
       updateWorkerState(workerRow.id, WorkerState.Errored);
-      notifyConcierg(`[ERROR | Worker #${workerRow.id}] Failed to start: ${(err as Error).message}`);
+      notifySvarog(`[ERROR | Worker #${workerRow.id}] Failed to start: ${(err as Error).message}`);
       this.removeWorkerFromPool(workerRow.id);
     });
   }
@@ -301,7 +301,7 @@ export class Dispatcher {
         }
       }
       log.warn({ questionId }, "No worker found with this question");
-      notifyConcierg("[ERROR] No worker found with this pending question.");
+      notifySvarog("[ERROR] No worker found with this pending question.");
       return;
     }
 
@@ -312,11 +312,11 @@ export class Dispatcher {
 
     if (workersWithQuestions.length === 1) {
       // Auto-route to the only waiting worker — but we don't know the questionId
-      notifyConcierg("[ERROR] Please reply to the specific question message or tap a button.");
+      notifySvarog("[ERROR] Please reply to the specific question message or tap a button.");
     } else if (workersWithQuestions.length > 1) {
-      notifyConcierg("[ERROR] Multiple workers waiting. Reply to the specific question.");
+      notifySvarog("[ERROR] Multiple workers waiting. Reply to the specific question.");
     } else {
-      notifyConcierg("[ERROR] No pending questions to answer.");
+      notifySvarog("[ERROR] No pending questions to answer.");
     }
   }
 
@@ -375,7 +375,7 @@ export class Dispatcher {
       if (active.length === 1) {
         targetId = active[0].id;
       } else {
-        notifyConcierg(`[ERROR] ${errorContext}: specify which worker.`);
+        notifySvarog(`[ERROR] ${errorContext}: specify which worker.`);
         return null;
       }
     }
@@ -386,7 +386,7 @@ export class Dispatcher {
     if (!session) {
       session = this.createSessionFromDb(targetId) ?? undefined;
       if (!session) {
-        notifyConcierg(`[ERROR | Worker #${targetId}] Worker not found or not running.`);
+        notifySvarog(`[ERROR | Worker #${targetId}] Worker not found or not running.`);
         return null;
       }
     }
@@ -397,16 +397,16 @@ export class Dispatcher {
         const resumeMsg = pendingMessage
           ? `[SYSTEM | Worker #${targetId}] Resuming, delivering your message shortly...`
           : `[SYSTEM | Worker #${targetId}] Resuming...`;
-        notifyConcierg(resumeMsg);
+        notifySvarog(resumeMsg);
         session.warmUp(worker.sessionId, pendingMessage)
           .catch((err) => {
             log.error({ err, workerId: targetId }, "Worker warm-up failed");
             updateWorkerState(targetId!, WorkerState.Errored);
-            notifyConcierg(`[ERROR | Worker #${targetId}] Resume failed: ${(err as Error).message}`);
+            notifySvarog(`[ERROR | Worker #${targetId}] Resume failed: ${(err as Error).message}`);
             this.removeWorkerFromPool(targetId!);
           });
       } else {
-        notifyConcierg(`[ERROR | Worker #${targetId}] Worker has no session to resume.`);
+        notifySvarog(`[ERROR | Worker #${targetId}] Worker has no session to resume.`);
       }
       return null;
     }
@@ -429,7 +429,7 @@ export class Dispatcher {
       await session.followUp(message);
     } catch (err) {
       log.error({ err, workerId: id }, "Failed to send follow-up");
-      notifyConcierg(`[ERROR | Worker #${id}] Worker not found or not running.`);
+      notifySvarog(`[ERROR | Worker #${id}] Worker not found or not running.`);
     }
   }
 
@@ -440,7 +440,7 @@ export class Dispatcher {
     if (!resolved) return;
     const { session, id } = resolved;
     if (!session.hasPendingPlan()) {
-      notifyConcierg(`[ERROR | Worker #${id}] No pending plan to approve.`);
+      notifySvarog(`[ERROR | Worker #${id}] No pending plan to approve.`);
       return;
     }
     session.resolvePlan("APPROVED: User approved the plan.");
@@ -451,7 +451,7 @@ export class Dispatcher {
     if (!resolved) return;
     const { session, id } = resolved;
     if (!session.hasPendingPlan()) {
-      notifyConcierg(`[ERROR | Worker #${id}] No pending plan to reject.`);
+      notifySvarog(`[ERROR | Worker #${id}] No pending plan to reject.`);
       return;
     }
     session.resolvePlan(`REJECTED: ${feedback}`);
@@ -468,7 +468,7 @@ export class Dispatcher {
       if (active.length === 1) {
         targetId = active[0].id;
       } else {
-        notifyConcierg("[ERROR] Specify which worker to stop.");
+        notifySvarog("[ERROR] Specify which worker to stop.");
         return;
       }
     }
@@ -477,10 +477,10 @@ export class Dispatcher {
     if (session) {
       session.abort();
       this.cleanupWorker(targetId);
-      notifyConcierg(`[STOPPED | Worker #${targetId}]`);
+      notifySvarog(`[STOPPED | Worker #${targetId}]`);
     } else {
       markWorkerStopped(targetId);
-      notifyConcierg(`[STOPPED | Worker #${targetId}] Marked stopped in DB.`);
+      notifySvarog(`[STOPPED | Worker #${targetId}] Marked stopped in DB.`);
     }
   }
 
@@ -488,24 +488,24 @@ export class Dispatcher {
     workerId: number | null,
   ): Promise<void> {
     if (!workerId) {
-      notifyConcierg("[ERROR] Specify which worker to pause.");
+      notifySvarog("[ERROR] Specify which worker to pause.");
       return;
     }
 
     const session = this.pool.get(workerId);
     if (!session) {
-      notifyConcierg(`[ERROR | Worker #${workerId}] Worker not found.`);
+      notifySvarog(`[ERROR | Worker #${workerId}] Worker not found.`);
       return;
     }
 
     if (session.state === WorkerState.WaitingInput) {
       log.warn({ workerId }, "Cannot pause worker in WaitingInput state");
-      notifyConcierg(`[ERROR | Worker #${workerId}] Worker is waiting for input — can't be paused. Answer the pending question or stop it.`);
+      notifySvarog(`[ERROR | Worker #${workerId}] Worker is waiting for input — can't be paused. Answer the pending question or stop it.`);
       return;
     }
 
     await session.interrupt();
-    notifyConcierg(`[PAUSED | Worker #${workerId}]`);
+    notifySvarog(`[PAUSED | Worker #${workerId}]`);
   }
 
   private async switchToPlan(workerId: number | null, reason: string): Promise<void> {
@@ -514,7 +514,7 @@ export class Dispatcher {
     const { session, id } = resolved;
 
     if (session.phase === 'planning') {
-      notifyConcierg(`[ERROR | Worker #${id}] Worker is already in planning mode.`);
+      notifySvarog(`[ERROR | Worker #${id}] Worker is already in planning mode.`);
       return;
     }
 
@@ -526,10 +526,10 @@ export class Dispatcher {
 
     try {
       await session.followUp(followUpMessage);
-      notifyConcierg(`[SWITCH_TO_PLAN | Worker #${id}] Switched back to planning mode.`);
+      notifySvarog(`[SWITCH_TO_PLAN | Worker #${id}] Switched back to planning mode.`);
     } catch (err) {
       log.error({ err, workerId: id }, "Failed to switch to plan");
-      notifyConcierg(`[ERROR | Worker #${id}] Failed to switch to plan: ${(err as Error).message}`);
+      notifySvarog(`[ERROR | Worker #${id}] Failed to switch to plan: ${(err as Error).message}`);
     }
   }
 
@@ -540,15 +540,15 @@ export class Dispatcher {
 
     if (session.hasPendingPlan()) {
       session.resolvePlan("APPROVED: User wants to skip plan review and execute directly.");
-      notifyConcierg(`[SKIP_PLAN | Worker #${id}] Plan review skipped, executing.`);
+      notifySvarog(`[SKIP_PLAN | Worker #${id}] Plan review skipped, executing.`);
     } else {
       session.switchToExecution();
       try {
         await session.followUp("STOP planning. User wants to skip the plan review step. Do NOT call ExitPlanMode. Start implementing immediately.");
-        notifyConcierg(`[SKIP_PLAN | Worker #${id}] Told worker to skip planning and execute.`);
+        notifySvarog(`[SKIP_PLAN | Worker #${id}] Told worker to skip planning and execute.`);
       } catch (err) {
         log.error({ err, workerId: id }, "Failed to skip plan");
-        notifyConcierg(`[ERROR | Worker #${id}] Failed to skip plan: ${(err as Error).message}`);
+        notifySvarog(`[ERROR | Worker #${id}] Failed to skip plan: ${(err as Error).message}`);
       }
     }
   }
@@ -556,7 +556,7 @@ export class Dispatcher {
   // --- Idle ---
 
   async handleIdleWorker(workerId: number): Promise<void> {
-    notifyConcierg(`[IDLE | Worker #${workerId}] Worker seems idle.`);
+    notifySvarog(`[IDLE | Worker #${workerId}] Worker seems idle.`);
     insertEvent(workerId, "idle_alert", {});
   }
 

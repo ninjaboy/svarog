@@ -1,34 +1,34 @@
 import { insertIntent } from "../db/queries.js";
 import type { ClassifiedIntent } from "../types/index.js";
-import { ConciergSession } from "./session.js";
+import { SvarogSession } from "./session.js";
 import type { ImageData } from "./session.js";
 import { createChildLogger } from "../utils/logger.js";
 
-const log = createChildLogger("concierg");
+const log = createChildLogger("svarog");
 
-let session: ConciergSession | null = null;
+let session: SvarogSession | null = null;
 
 // --- Session lifecycle ---
 
-export async function startConciergSession(): Promise<void> {
-  session = new ConciergSession();
+export async function startSvarogSession(): Promise<void> {
+  session = new SvarogSession();
   await session.start();
-  log.info("Concierg session started");
+  log.info("Svarog session started");
 }
 
-export async function stopConciergSession(): Promise<void> {
+export async function stopSvarogSession(): Promise<void> {
   if (session) {
     await session.stop();
     session = null;
   }
 }
 
-export async function pingConciergSession(): Promise<boolean> {
+export async function pingSvarogSession(): Promise<boolean> {
   if (!session || !session.isAlive()) return false;
   return session.ping();
 }
 
-export function notifyConcierg(eventText: string): void {
+export function notifySvarog(eventText: string): void {
   session?.notify(eventText);
 }
 
@@ -51,8 +51,8 @@ export async function processMessage(
 ): Promise<void> {
   // Ensure session is alive
   if (!session || !session.isAlive()) {
-    log.warn("Concierg session not alive, restarting");
-    session = new ConciergSession();
+    log.warn("Svarog session not alive, restarting");
+    session = new SvarogSession();
     await session.start();
   }
 

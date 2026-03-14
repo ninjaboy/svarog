@@ -5,6 +5,6 @@ export default defineConfig({
   schema: "./src/db/schema.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: process.env.DB_PATH || "./data/conciergon.db",
+    url: process.env.DB_PATH || "./data/svarog.db",
   },
 });

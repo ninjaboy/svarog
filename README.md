@@ -1,12 +1,12 @@
-# Conciergon
+# Svarog
 
 <p align="center">
-  <img src="assets/conciergon-art.jpg" alt="Conciergon" width="480" />
+  <img src="assets/svarog-art.jpg" alt="Svarog" width="480" />
   <br />
   <em>As seen through my son's eyes via ChatGPT</em>
 </p>
 
-A Telegram bot that manages [Claude Code](https://docs.anthropic.com/en/docs/claude-code) worker sessions on your projects. Send tasks in natural language via Telegram, and Conciergon spawns AI workers to implement them across your codebases.
+A Telegram bot that manages [Claude Code](https://docs.anthropic.com/en/docs/claude-code) worker sessions on your projects. Send tasks in natural language via Telegram, and Svarog spawns AI workers to implement them across your codebases.
 
 ## Features
 
@@ -23,7 +23,7 @@ A Telegram bot that manages [Claude Code](https://docs.anthropic.com/en/docs/cla
 ```
                         incoming messages
 +----------+    +----------+    +-----------+    +------------+    +-------------+
-| Telegram |----> Telegram |----> Concierg  |----> Dispatcher |----> Worker Pool |
+| Telegram |----> Telegram |----> Svarog  |----> Dispatcher |----> Worker Pool |
 |   User   |    | Bot      |    | Session   |    | (router)   |    | (Claude Code)|
 +----------+    +----+-----+    +-----------+    +-----+------+    +------+------+
                      ^                                 |                  |
@@ -38,7 +38,7 @@ A Telegram bot that manages [Claude Code](https://docs.anthropic.com/en/docs/cla
 +-----------+    +----------+    +-----------------+
 ```
 
-**Message flow:** User sends a Telegram message → Concierg Session (a persistent Claude Code subprocess) classifies the intent → Dispatcher routes it → Worker (another Claude Code subprocess) executes the task on the target project → Results sent back via Telegram.
+**Message flow:** User sends a Telegram message → Svarog Session (a persistent Claude Code subprocess) classifies the intent → Dispatcher routes it → Worker (another Claude Code subprocess) executes the task on the target project → Results sent back via Telegram.
 
 ## Prerequisites
 
@@ -51,8 +51,8 @@ A Telegram bot that manages [Claude Code](https://docs.anthropic.com/en/docs/cla
 
 ```bash
 # 1. Clone
-git clone https://github.com/anthropics/conciergon.git
-cd conciergon
+git clone https://github.com/anthropics/svarog.git
+cd svarog
 
 # 2. Install dependencies
 npm install
@@ -84,7 +84,7 @@ cp .env.example .env
 | `ANTHROPIC_AUTH_TOKEN` | One of these | — | OAuth token (from `claude login`) |
 | `ANTHROPIC_API_KEY` | One of these | — | API key (alternative to OAuth) |
 | `PROJECTS_DIR` | No | `~/projects` | Directory to scan for projects |
-| `DB_PATH` | No | `./data/conciergon.db` | SQLite database file path |
+| `DB_PATH` | No | `./data/svarog.db` | SQLite database file path |
 | `HEALTH_PORT` | No | `3847` | HTTP health endpoint port |
 | `WATCHDOG_INTERVAL_MS` | No | `1500` | Idle worker check frequency (ms) |
 | `WORKER_IDLE_TIMEOUT_S` | No | `300` | Seconds before worker idle alert |
@@ -95,9 +95,9 @@ cp .env.example .env
 
 ### Authentication
 
-Conciergon needs Anthropic credentials to run Claude Code workers. Two options:
+Svarog needs Anthropic credentials to run Claude Code workers. Two options:
 
-1. **OAuth (recommended):** Run `claude login` to authenticate via the Claude Code CLI. Conciergon reads the OAuth token from the macOS Keychain and auto-refreshes it.
+1. **OAuth (recommended):** Run `claude login` to authenticate via the Claude Code CLI. Svarog reads the OAuth token from the macOS Keychain and auto-refreshes it.
 
 2. **API Key:** Set `ANTHROPIC_API_KEY` in `.env`. Works on all platforms. No auto-refresh needed (keys don't expire).
 
@@ -105,7 +105,7 @@ On Linux, the Keychain-based token refresh is unavailable. Use an API key or man
 
 ## How It Works
 
-1. **Concierg Session** — A persistent Claude Code subprocess that classifies every incoming Telegram message into intents (spawn worker, follow up, approve plan, answer question, etc.)
+1. **Svarog Session** — A persistent Claude Code subprocess that classifies every incoming Telegram message into intents (spawn worker, follow up, approve plan, answer question, etc.)
 
 2. **Dispatcher** — Routes classified intents to the right handler: spawning new workers, delivering follow-ups, resolving plan approvals, routing answers to pending questions.
 

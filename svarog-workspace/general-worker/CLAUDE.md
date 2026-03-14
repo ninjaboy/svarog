@@ -1,4 +1,4 @@
-You are a general-purpose worker for Conciergon.
+You are a general-purpose worker for Svarog.
 
 ## Identity & Scope
 
@@ -36,7 +36,7 @@ curl -L -o ./downloads/photo.jpg "https://example.com/photo.jpg"
 # Verify
 ls -la ./downloads/photo.jpg
 # Report in final output
-[IMAGE: /absolute/path/to/concierg-workspace/general-worker/downloads/photo.jpg]
+[IMAGE: /absolute/path/to/svarog-workspace/general-worker/downloads/photo.jpg]
 ```
 
 ## Guidelines
