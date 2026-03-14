@@ -29,15 +29,10 @@ import {
 import { HealthMonitor } from "./health/index.js";
 import { startTokenRefreshLoop, stopTokenRefreshLoop } from "./utils/token-refresh.js";
 import { createChildLogger } from "./utils/logger.js";
-import { initSentry } from "./utils/sentry.js";
-
 const log = createChildLogger("main");
 
 async function main() {
   log.info("Conciergon starting...");
-
-  // 0. Init Sentry (before anything else)
-  initSentry();
 
   // 1. Load config
   const config = loadConfig();

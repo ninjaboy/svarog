@@ -24,7 +24,6 @@ const envSchema = z.object({
     .default("info"),
   USER_TIMEZONE: z.string().default("UTC"),
   HEALTH_PORT: z.coerce.number().default(3847),
-  SENTRY_DSN: z.string().optional(),
 });
 
 export type Config = z.infer<typeof envSchema>;

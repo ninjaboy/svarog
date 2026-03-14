@@ -10,7 +10,6 @@ import {
 import { getConciergContext } from "../db/queries.js";
 import { buildCleanEnv } from "../utils/env.js";
 import { createChildLogger } from "../utils/logger.js";
-import { captureException } from "../utils/sentry.js";
 import {
   conciergMcpServer,
   setMcpContext,
@@ -333,7 +332,6 @@ export class ConciergSession {
         log.warn("SDK exited with code 1, continuing with collected intents");
       } else {
         log.error({ err }, "Concierg query error");
-        captureException(err);
         // Send user-friendly message instead of throwing
         try {
           if (chatId) {

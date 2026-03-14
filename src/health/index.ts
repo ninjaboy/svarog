@@ -2,7 +2,6 @@ import { createServer, type Server } from "node:http";
 import type { Bot } from "grammy";
 import { getConfig } from "../config/index.js";
 import { createChildLogger } from "../utils/logger.js";
-import { captureException } from "../utils/sentry.js";
 
 const log = createChildLogger("health");
 
@@ -161,7 +160,6 @@ export class HealthMonitor {
       }
     } catch (err) {
       log.error({ err, isPollingStale }, "Telegram health check failed");
-      captureException(err);
       this.state.telegram = { status: "restarting", lastCheck: now };
 
       try {
@@ -190,8 +188,6 @@ export class HealthMonitor {
     } catch (err) {
       const now = Date.now();
       log.error({ err }, "SDK health check failed");
-      captureException(err);
-
       this.sdkFailures.push(now);
       // Prune old failures outside the alert window
       this.sdkFailures = this.sdkFailures.filter((t) => now - t < SDK_ALERT_WINDOW_MS);

@@ -92,7 +92,6 @@ cp .env.example .env
 | `WORKER_RESUME_MAX_AGE_S` | No | `3600` | Max age for worker session resume |
 | `LOG_LEVEL` | No | `info` | Log level: trace, debug, info, warn, error, fatal |
 | `USER_TIMEZONE` | No | `UTC` | Timezone for scheduled tasks |
-| `SENTRY_DSN` | No | — | Sentry error tracking (optional) |
 
 ### Authentication
 

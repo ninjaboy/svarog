@@ -3,7 +3,6 @@ import { join } from "node:path";
 import { Api, Bot, Context, InlineKeyboard, InputFile } from "grammy";
 import { getConfig } from "../config/index.js";
 import { createChildLogger } from "../utils/logger.js";
-import { captureException } from "../utils/sentry.js";
 import { markdownToTelegramHtml, markdownToTelegramChunks, escapeHtml, stripHtmlTags } from "./format.js";
 import type { ImageData } from "../concierg/session.js";
 export type { ImageData };
@@ -301,7 +300,6 @@ export function initTelegramBot(): Bot {
   // Global error handler — prevent unhandled errors from crashing the process
   bot.catch((err) => {
     log.error({ err: err.error, ctx: err.ctx?.update?.update_id }, "Unhandled bot error");
-    captureException(err.error);
   });
 
   log.info("Telegram bot initialized");

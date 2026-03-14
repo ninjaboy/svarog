@@ -151,7 +151,7 @@ export async function runSetup(): Promise<void> {
   // ── Step 5: Optional Settings ───────────────────────────────
   const configureOptional = guardCancel(
     await p.confirm({
-      message: "Configure optional settings? (health port, log level, timezone, Sentry)",
+      message: "Configure optional settings? (health port, log level, timezone)",
       initialValue: false,
     })
   );
@@ -159,8 +159,6 @@ export async function runSetup(): Promise<void> {
   let logLevel: string | undefined;
   let timezone: string | undefined;
   let healthPort: number | undefined;
-  let sentryDsn: string | undefined;
-
   if (configureOptional) {
     logLevel = guardCancel(
       await p.select({
@@ -193,14 +191,6 @@ export async function runSetup(): Promise<void> {
       })
     ) as string;
     healthPort = Number(portStr);
-
-    sentryDsn = guardCancel(
-      await p.text({
-        message: "Sentry DSN (leave empty to skip)",
-        placeholder: "https://...@....ingest.sentry.io/...",
-      })
-    ) as string;
-    if (!sentryDsn.trim()) sentryDsn = undefined;
   }
 
   // ── Step 6: Write .env ──────────────────────────────────────
@@ -213,7 +203,6 @@ export async function runSetup(): Promise<void> {
     ...(logLevel && logLevel !== "info" ? { LOG_LEVEL: logLevel } : {}),
     ...(timezone && timezone !== "UTC" ? { USER_TIMEZONE: timezone.trim() } : {}),
     ...(healthPort && healthPort !== 3847 ? { HEALTH_PORT: healthPort } : {}),
-    ...(sentryDsn ? { SENTRY_DSN: sentryDsn.trim() } : {}),
   };
 
   writeEnvFile(values);

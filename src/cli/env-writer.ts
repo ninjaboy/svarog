@@ -11,7 +11,6 @@ export interface EnvValues {
   HEALTH_PORT?: number;
   LOG_LEVEL?: string;
   USER_TIMEZONE?: string;
-  SENTRY_DSN?: string;
 }
 
 /**
@@ -71,10 +70,6 @@ export function writeEnvFile(values: EnvValues, envPath = ".env"): void {
   if (values.USER_TIMEZONE && values.USER_TIMEZONE !== "UTC") {
     lines.push(`USER_TIMEZONE=${values.USER_TIMEZONE}`);
   }
-  if (values.SENTRY_DSN) {
-    lines.push(`SENTRY_DSN=${values.SENTRY_DSN}`);
-  }
-
   // Write atomically: tmp then rename
   const tmpPath = resolved + ".tmp";
   writeFileSync(tmpPath, lines.join("\n") + "\n", { mode: 0o600 });

@@ -2,7 +2,6 @@ import { getConfig } from "../config/index.js";
 import { getIdleWorkers } from "../db/queries.js";
 import type { Dispatcher } from "../dispatcher/index.js";
 import { createChildLogger } from "../utils/logger.js";
-import { captureException } from "../utils/sentry.js";
 
 const log = createChildLogger("watchdog");
 
@@ -52,7 +51,6 @@ export class Watchdog {
       await this.monitorWorkers();
     } catch (err) {
       log.error({ err }, "Watchdog tick error");
-      captureException(err);
     }
   }
 
