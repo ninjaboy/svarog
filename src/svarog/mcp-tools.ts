@@ -14,6 +14,7 @@ import {
 import { getConfig } from "../config/index.js";
 import { INTENT_TYPES, type IntentType } from "../types/index.js";
 import { createChildLogger } from "../utils/logger.js";
+import { workerLabel } from "../utils/worker-label.js";
 
 const log = createChildLogger("mcp-tools");
 
@@ -227,7 +228,7 @@ const getSystemStateTool = tool(
       const projectNames = context.projects.map((p) => p.name).join(", ");
       const activeWorkers = context.activeWorkers
         .map((w) => {
-          let info = `  Worker #${w.id}: project_id=${w.projectId}, state=${w.state}, prompt="${w.currentPrompt}"`;
+          let info = `  ${workerLabel(w.id, w.userSummary)}: project_id=${w.projectId}, state=${w.state}, prompt="${w.currentPrompt}"`;
 
           // Pool info from dispatcher
           const pInfo = poolInfoGetter?.(w.id);
@@ -265,7 +266,7 @@ const getSystemStateTool = tool(
         .join("\n");
       const recoverableWorkers = context.recoverableWorkers
         .map((w) => {
-          let info = `  Worker #${w.id}: project_id=${w.projectId}, prompt="${w.currentPrompt}"`;
+          let info = `  ${workerLabel(w.id, w.userSummary)}: project_id=${w.projectId}, prompt="${w.currentPrompt}"`;
           if (w.lastActivityAt) {
             const minutes = Math.floor(
               (Date.now() - new Date(w.lastActivityAt + "Z").getTime()) / 60000

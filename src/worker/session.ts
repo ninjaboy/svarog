@@ -25,6 +25,7 @@ import { WorkerState } from "../types/index.js";
 import type { AskUserQuestionItem } from "../types/index.js";
 import { createChildLogger } from "../utils/logger.js";
 import { buildCleanEnv } from "../utils/env.js";
+import { workerLabel } from "../utils/worker-label.js";
 
 const log = createChildLogger("worker");
 
@@ -218,6 +219,7 @@ export interface WorkerTelegramContext {
     questionId: number,
     question: string,
     emoji?: string,
+    label?: string,
   ) => Promise<number>;
   /** Send a photo to Telegram */
   sendPhoto: (chatId: number, photoPath: string, caption?: string) => Promise<number>;
@@ -262,18 +264,27 @@ export class WorkerLLM {
 
   onCompletion: CompletionHandler | null = null;
 
+  /** Human-readable summary shown alongside worker ID in Telegram messages */
+  readonly userSummary: string | null;
+
+  /** Pre-computed label: "#N (summary)" or "#N" */
+  readonly label: string;
+
   constructor(
     id: number,
     projectPath: string,
     prompt: string,
     telegramCtx: WorkerTelegramContext,
     permissionMode: 'plan' | 'default' = 'plan',
+    userSummary?: string | null,
   ) {
     this.id = id;
     this.projectPath = projectPath;
     this.prompt = prompt;
     this.telegramCtx = telegramCtx;
     this._permissionMode = permissionMode;
+    this.userSummary = userSummary ?? null;
+    this.label = workerLabel(id, userSummary);
   }
 
   get state(): WorkerState {
@@ -442,6 +453,7 @@ export class WorkerLLM {
           questionRow.id,
           formattedText,
           this.telegramCtx.emoji,
+          this.label,
         );
 
         // Track message for reply routing
@@ -503,7 +515,7 @@ export class WorkerLLM {
           ].filter(Boolean).join("\n\n");
 
           const formatted = await this.callHaiku(bundle, FOLLOWUP_ANSWER_INSTRUCTION, workerText || rawPlan, "follow-up answer");
-          const text = `${this.telegramCtx.emoji} #${this.id}:\n\n${formatted}`;
+          const text = `${this.telegramCtx.emoji} ${this.label}:\n\n${formatted}`;
           const msgIds = await this.telegramCtx.sendLongMessage(this.telegramCtx.chatId, text);
           for (const mid of msgIds) {
             this.telegramCtx.trackMessage(mid, this.id);
@@ -514,7 +526,7 @@ export class WorkerLLM {
         } else {
           // First plan: format and send normally
           const formattedPlan = await this.callHaiku(rawPlan, PLAN_INSTRUCTION, rawPlan, "plan formatter");
-          const planText = `${this.telegramCtx.emoji} Worker #${this.id} submitted a plan:\n\n${formattedPlan}\n\nReply "approve" to proceed or "reject" with feedback.`;
+          const planText = `${this.telegramCtx.emoji} ${this.label} submitted a plan:\n\n${formattedPlan}\n\nReply "approve" to proceed or "reject" with feedback.`;
           const msgIds = await this.telegramCtx.sendLongMessage(this.telegramCtx.chatId, planText);
           for (const mid of msgIds) {
             this.telegramCtx.trackMessage(mid, this.id);
@@ -683,7 +695,7 @@ export class WorkerLLM {
 
         // Send error to Telegram and notify completion handler
         try {
-          const text = `${this.telegramCtx.emoji} #${this.id} Error: ${errorMsg.slice(0, 500)}`;
+          const text = `${this.telegramCtx.emoji} ${this.label} Error: ${errorMsg.slice(0, 500)}`;
           await this.telegramCtx.sendMessage(this.telegramCtx.chatId, text);
         } catch { /* ignore send errors */ }
 
@@ -759,7 +771,7 @@ export class WorkerLLM {
       }
     }
 
-    const text = `${this.telegramCtx.emoji} #${this.id} done — $${cost}\n\n${resultText}`;
+    const text = `${this.telegramCtx.emoji} ${this.label} done — $${cost}\n\n${resultText}`;
 
     try {
       const msgIds = await this.telegramCtx.sendLongMessage(this.telegramCtx.chatId, text);
@@ -793,7 +805,7 @@ export class WorkerLLM {
     }
 
     const projectName = basename(this.projectPath);
-    const initContext = `Worker #${this.id} ${this.telegramCtx.emoji} • ${projectName}\n${this.prompt}`;
+    const initContext = `${this.label} ${this.telegramCtx.emoji} • ${projectName}\n${this.prompt}`;
     const { sessionId } = await haikuFormat(initContext, 'Acknowledge with "Ready".', '', 'haiku-init');
     if (sessionId) {
       this.haikuSessionId = sessionId;
@@ -842,7 +854,7 @@ export class WorkerLLM {
       await this.query.interrupt();
       return;
     }
-    throw new Error(`Worker #${this.id} cannot accept follow-ups`);
+    throw new Error(`Worker ${this.label} cannot accept follow-ups`);
   }
 
   async interrupt(): Promise<void> {
@@ -867,7 +879,7 @@ export class WorkerLLM {
   /** Wake a cold worker by starting its SDK session. */
   async warmUp(resumeSessionId: string, initialPrompt?: string): Promise<void> {
     if (!this.isCold()) {
-      throw new Error(`Worker #${this.id} is already warm`);
+      throw new Error(`Worker ${this.label} is already warm`);
     }
     this.sessionId = resumeSessionId;
     await this.start(resumeSessionId, initialPrompt);

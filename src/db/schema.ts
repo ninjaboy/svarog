@@ -37,6 +37,7 @@ export const workers = sqliteTable("workers", {
   state: text("state").notNull().default("starting"), // WorkerState enum: starting | active | waiting_input | errored (+ "stopped" DB-only)
   currentPrompt: text("current_prompt").notNull(),
   emoji: text("emoji"),
+  userSummary: text("user_summary"),
   permissionMode: text("permission_mode").notNull().default("plan"), // 'plan' | 'default'
   telegramChatId: integer("telegram_chat_id").notNull(),
   lastActivityAt: text("last_activity_at")

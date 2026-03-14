@@ -409,13 +409,15 @@ export async function sendQuestionMessage(
   _questionId: number,
   question: string,
   emoji?: string,
+  label?: string,
 ): Promise<number> {
   if (!bot) throw new Error("Bot not initialized");
 
+  const displayLabel = label || `#${workerId}`;
   const escaped = escapeHtml(question);
   const emojiPrefix = emoji ? `${emoji} ` : '';
   const text =
-    `${emojiPrefix}<b>Worker #${workerId} asks:</b>\n\n${escaped}\n\n` +
+    `${emojiPrefix}<b>${escapeHtml(displayLabel)} asks:</b>\n\n${escaped}\n\n` +
     `<i>Reply to this message with your answer.</i>`;
 
   try {
@@ -423,7 +425,7 @@ export async function sendQuestionMessage(
     return msg.message_id;
   } catch {
     const plainEmoji = emoji ? `${emoji} ` : '';
-    const plain = `${plainEmoji}Worker #${workerId} asks:\n\n${question}\n\nReply to this message with your answer.`;
+    const plain = `${plainEmoji}${displayLabel} asks:\n\n${question}\n\nReply to this message with your answer.`;
     const msg = await bot.api.sendMessage(chatId, plain);
     return msg.message_id;
   }

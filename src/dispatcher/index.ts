@@ -21,6 +21,7 @@ import {
 import { getConfig } from "../config/index.js";
 import { WorkerState } from "../types/index.js";
 import { createChildLogger } from "../utils/logger.js";
+import { workerLabel } from "../utils/worker-label.js";
 import { WorkerLLM, WorkerPool } from "../worker/index.js";
 import type { WorkerTelegramContext } from "../worker/session.js";
 
@@ -43,6 +44,7 @@ export interface TelegramFunctions {
     questionId: number,
     question: string,
     emoji?: string,
+    label?: string,
   ) => Promise<number>;
   sendPhoto: (chatId: number, photoPath: string, caption?: string) => Promise<number>;
 }
@@ -188,6 +190,14 @@ export class Dispatcher {
     }
   }
 
+  /** Get a human-readable label for a worker: "#N (summary)" or "#N". */
+  private labelFor(workerId: number): string {
+    const session = this.pool.get(workerId);
+    if (session) return session.label;
+    const worker = getWorkerById(workerId);
+    return workerLabel(workerId, worker?.userSummary);
+  }
+
   // --- Telegram context factory ---
 
   private makeTelegramContext(chatId: number, emoji: string): WorkerTelegramContext {
@@ -247,7 +257,7 @@ export class Dispatcher {
       resolvedProjectName = project.name;
     }
 
-    const workerRow = insertWorker(projectId, prompt, chatId, emoji);
+    const workerRow = insertWorker(projectId, prompt, chatId, emoji, userSummary);
     const workerEmoji = emoji || "🔵";
 
     // Enrich prompt with evidence instructions
@@ -264,6 +274,7 @@ export class Dispatcher {
       enrichedPrompt,
       telegramCtx,
       planMode ? 'plan' : 'default',
+      userSummary,
     );
 
     // Wire completion callback
@@ -276,14 +287,14 @@ export class Dispatcher {
 
     // Notify user via Svarog
     notifySvarog(
-      `[SPAWN | Worker #${workerRow.id} | ${workerEmoji} | project: ${resolvedProjectName} | mode: ${planMode ? 'plan' : 'default'}] Task: "${userSummary || prompt}"`
+      `[SPAWN | ${session.label} | ${workerEmoji} | project: ${resolvedProjectName} | mode: ${planMode ? 'plan' : 'default'}] Task: "${userSummary || prompt}"`
     );
 
     // Start worker in background
     session.start().catch((err) => {
       log.error({ err, workerId: workerRow.id }, "Worker start failed");
       updateWorkerState(workerRow.id, WorkerState.Errored);
-      notifySvarog(`[ERROR | Worker #${workerRow.id}] Failed to start: ${(err as Error).message}`);
+      notifySvarog(`[ERROR | ${session.label}] Failed to start: ${(err as Error).message}`);
       this.removeWorkerFromPool(workerRow.id);
     });
   }
@@ -354,7 +365,7 @@ export class Dispatcher {
     log.info({ workerId }, "Creating session from DB");
     const telegramCtx = this.makeTelegramContext(worker.telegramChatId, worker.emoji || "🔵");
     const restoredMode = (worker.permissionMode as 'plan' | 'default') || 'plan';
-    const session = new WorkerLLM(worker.id, project.path, worker.currentPrompt, telegramCtx, restoredMode);
+    const session = new WorkerLLM(worker.id, project.path, worker.currentPrompt, telegramCtx, restoredMode, worker.userSummary);
     session.restorePlanState(restoredMode);
     this.pool.add(session);
     return session;
@@ -388,27 +399,28 @@ export class Dispatcher {
     if (!session) {
       session = this.createSessionFromDb(targetId) ?? undefined;
       if (!session) {
-        notifySvarog(`[ERROR | Worker #${targetId}] Worker not found or not running.`);
+        notifySvarog(`[ERROR | ${this.labelFor(targetId)}] Worker not found or not running.`);
         return null;
       }
     }
 
     if (session.isCold()) {
       const worker = getWorkerById(targetId);
+      const label = session.label;
       if (worker?.sessionId) {
         const resumeMsg = pendingMessage
-          ? `[SYSTEM | Worker #${targetId}] Resuming, delivering your message shortly...`
-          : `[SYSTEM | Worker #${targetId}] Resuming...`;
+          ? `[SYSTEM | ${label}] Resuming, delivering your message shortly...`
+          : `[SYSTEM | ${label}] Resuming...`;
         notifySvarog(resumeMsg);
         session.warmUp(worker.sessionId, pendingMessage)
           .catch((err) => {
             log.error({ err, workerId: targetId }, "Worker warm-up failed");
             updateWorkerState(targetId!, WorkerState.Errored);
-            notifySvarog(`[ERROR | Worker #${targetId}] Resume failed: ${(err as Error).message}`);
+            notifySvarog(`[ERROR | ${label}] Resume failed: ${(err as Error).message}`);
             this.removeWorkerFromPool(targetId!);
           });
       } else {
-        notifySvarog(`[ERROR | Worker #${targetId}] Worker has no session to resume.`);
+        notifySvarog(`[ERROR | ${label}] Worker has no session to resume.`);
       }
       return null;
     }
@@ -431,7 +443,7 @@ export class Dispatcher {
       await session.followUp(message);
     } catch (err) {
       log.error({ err, workerId: id }, "Failed to send follow-up");
-      notifySvarog(`[ERROR | Worker #${id}] Worker not found or not running.`);
+      notifySvarog(`[ERROR | ${this.labelFor(id)}] Worker not found or not running.`);
     }
   }
 
@@ -442,7 +454,7 @@ export class Dispatcher {
     if (!resolved) return;
     const { session, id } = resolved;
     if (!session.hasPendingPlan()) {
-      notifySvarog(`[ERROR | Worker #${id}] No pending plan to approve.`);
+      notifySvarog(`[ERROR | ${this.labelFor(id)}] No pending plan to approve.`);
       return;
     }
     session.resolvePlan("APPROVED: User approved the plan.");
@@ -453,7 +465,7 @@ export class Dispatcher {
     if (!resolved) return;
     const { session, id } = resolved;
     if (!session.hasPendingPlan()) {
-      notifySvarog(`[ERROR | Worker #${id}] No pending plan to reject.`);
+      notifySvarog(`[ERROR | ${this.labelFor(id)}] No pending plan to reject.`);
       return;
     }
     session.resolvePlan(`REJECTED: ${feedback}`);
@@ -475,14 +487,15 @@ export class Dispatcher {
       }
     }
 
+    const label = this.labelFor(targetId);
     const session = this.pool.get(targetId);
     if (session) {
       session.abort();
       this.cleanupWorker(targetId);
-      notifySvarog(`[STOPPED | Worker #${targetId}]`);
+      notifySvarog(`[STOPPED | ${label}]`);
     } else {
       markWorkerStopped(targetId);
-      notifySvarog(`[STOPPED | Worker #${targetId}] Marked stopped in DB.`);
+      notifySvarog(`[STOPPED | ${label}] Marked stopped in DB.`);
     }
   }
 
@@ -496,18 +509,18 @@ export class Dispatcher {
 
     const session = this.pool.get(workerId);
     if (!session) {
-      notifySvarog(`[ERROR | Worker #${workerId}] Worker not found.`);
+      notifySvarog(`[ERROR | ${this.labelFor(workerId)}] Worker not found.`);
       return;
     }
 
     if (session.state === WorkerState.WaitingInput) {
       log.warn({ workerId }, "Cannot pause worker in WaitingInput state");
-      notifySvarog(`[ERROR | Worker #${workerId}] Worker is waiting for input — can't be paused. Answer the pending question or stop it.`);
+      notifySvarog(`[ERROR | ${session.label}] Worker is waiting for input — can't be paused. Answer the pending question or stop it.`);
       return;
     }
 
     await session.interrupt();
-    notifySvarog(`[PAUSED | Worker #${workerId}]`);
+    notifySvarog(`[PAUSED | ${session.label}]`);
   }
 
   private async switchToPlan(workerId: number | null, reason: string): Promise<void> {
@@ -516,7 +529,7 @@ export class Dispatcher {
     const { session, id } = resolved;
 
     if (session.phase === 'planning') {
-      notifySvarog(`[ERROR | Worker #${id}] Worker is already in planning mode.`);
+      notifySvarog(`[ERROR | ${this.labelFor(id)}] Worker is already in planning mode.`);
       return;
     }
 
@@ -528,10 +541,10 @@ export class Dispatcher {
 
     try {
       await session.followUp(followUpMessage);
-      notifySvarog(`[SWITCH_TO_PLAN | Worker #${id}] Switched back to planning mode.`);
+      notifySvarog(`[SWITCH_TO_PLAN | ${this.labelFor(id)}] Switched back to planning mode.`);
     } catch (err) {
       log.error({ err, workerId: id }, "Failed to switch to plan");
-      notifySvarog(`[ERROR | Worker #${id}] Failed to switch to plan: ${(err as Error).message}`);
+      notifySvarog(`[ERROR | ${this.labelFor(id)}] Failed to switch to plan: ${(err as Error).message}`);
     }
   }
 
@@ -542,15 +555,15 @@ export class Dispatcher {
 
     if (session.hasPendingPlan()) {
       session.resolvePlan("APPROVED: User wants to skip plan review and execute directly.");
-      notifySvarog(`[SKIP_PLAN | Worker #${id}] Plan review skipped, executing.`);
+      notifySvarog(`[SKIP_PLAN | ${this.labelFor(id)}] Plan review skipped, executing.`);
     } else {
       session.switchToExecution();
       try {
         await session.followUp("STOP planning. User wants to skip the plan review step. Do NOT call ExitPlanMode. Start implementing immediately.");
-        notifySvarog(`[SKIP_PLAN | Worker #${id}] Told worker to skip planning and execute.`);
+        notifySvarog(`[SKIP_PLAN | ${this.labelFor(id)}] Told worker to skip planning and execute.`);
       } catch (err) {
         log.error({ err, workerId: id }, "Failed to skip plan");
-        notifySvarog(`[ERROR | Worker #${id}] Failed to skip plan: ${(err as Error).message}`);
+        notifySvarog(`[ERROR | ${this.labelFor(id)}] Failed to skip plan: ${(err as Error).message}`);
       }
     }
   }
@@ -558,7 +571,7 @@ export class Dispatcher {
   // --- Idle ---
 
   async handleIdleWorker(workerId: number): Promise<void> {
-    notifySvarog(`[IDLE | Worker #${workerId}] Worker seems idle.`);
+    notifySvarog(`[IDLE | ${this.labelFor(workerId)}] Worker seems idle.`);
     insertEvent(workerId, "idle_alert", {});
   }
 

@@ -131,6 +131,12 @@ function createTables(sqlite: Database.Database) {
     // Column already exists — ignore
   }
 
+  try {
+    sqlite.prepare("ALTER TABLE workers ADD COLUMN user_summary TEXT").run();
+  } catch {
+    // Column already exists — ignore
+  }
+
   // Migrate old worker states to new 4-state enum
   // idle → active, waiting_approval → waiting_input, paused → active, completed → errored
   // "stopped" kept as-is (DB-only audit value)

@@ -70,11 +70,18 @@ export function insertWorker(
   projectId: number,
   prompt: string,
   telegramChatId: number,
-  emoji?: string | null
+  emoji?: string | null,
+  userSummary?: string | null,
 ) {
   return getDb()
     .insert(schema.workers)
-    .values({ projectId, currentPrompt: prompt, telegramChatId, ...(emoji ? { emoji } : {}) })
+    .values({
+      projectId,
+      currentPrompt: prompt,
+      telegramChatId,
+      ...(emoji ? { emoji } : {}),
+      ...(userSummary ? { userSummary } : {}),
+    })
     .returning()
     .get();
 }

@@ -269,7 +269,7 @@ export class SvarogSession {
           "- User wants to re-enable → manage_schedule(action='enable', scheduleId=N)",
           "- Default timezone from config. Override if user specifies one.",
           "",
-          "SYSTEM EVENTS from workers arrive with metadata like [SPAWN | Worker #ID | ...]",
+          "SYSTEM EVENTS from workers arrive with metadata like [SPAWN | #ID (summary) | ...]",
           "When forwarding system events to the user:",
           "- For [SPAWN | ...] events: confirm the worker was started with task summary",
           "- For [ERROR | ...] events: tell the user what went wrong",
