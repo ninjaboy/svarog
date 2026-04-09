@@ -24,11 +24,21 @@ export type EditHandler = (
   chatId: number
 ) => Promise<void>;
 
+export type AnswerCallbackFn = (text?: string, showAlert?: boolean) => Promise<void>;
+
 export type CallbackQueryHandler = (
   data: string,
   messageId: number,
-  chatId: number
+  chatId: number,
+  answer: AnswerCallbackFn,
 ) => Promise<void>;
+
+export interface TelegramButton {
+  text: string;
+  callbackData?: string;
+  url?: string;
+  style?: 'danger' | 'success' | 'primary';
+}
 
 let bot: Bot | null = null;
 let botShouldRun = false;
@@ -36,6 +46,7 @@ let messageHandler: MessageHandler | null = null;
 let editHandler: EditHandler | null = null;
 let callbackQueryHandler: CallbackQueryHandler | null = null;
 let restartHandler: (() => Promise<void>) | null = null;
+let statusHandler: ((chatId: number) => Promise<void>) | null = null;
 
 // --- Photo download & save helpers ---
 
@@ -264,12 +275,20 @@ export function initTelegramBot(): Bot {
 
     if (!messageId || !chatId) return;
 
-    await ctx.answerCallbackQuery();
+    let answered = false;
+    const answer: AnswerCallbackFn = async (text, showAlert) => {
+      if (answered) return;
+      answered = true;
+      await ctx.answerCallbackQuery({ text, show_alert: showAlert });
+    };
 
     try {
-      await callbackQueryHandler(data, messageId, chatId);
+      await callbackQueryHandler(data, messageId, chatId, answer);
     } catch (err) {
       log.error({ err }, "Error handling callback query");
+    } finally {
+      // Always answer callback to clear loading indicator
+      if (!answered) await ctx.answerCallbackQuery().catch(() => {});
     }
   });
 
@@ -281,9 +300,11 @@ export function initTelegramBot(): Bot {
     );
   });
 
-  // /status command
+  // /status command — interactive buttons UI (fast path, no AI)
   bot.command("status", async (ctx) => {
-    if (messageHandler) {
+    if (statusHandler) {
+      await statusHandler(ctx.chat.id);
+    } else if (messageHandler) {
       await messageHandler("status", ctx.message!.message_id, ctx.chat.id, null, null, []);
     }
   });
@@ -316,6 +337,10 @@ export function setEditHandler(handler: EditHandler) {
 
 export function setCallbackQueryHandler(handler: CallbackQueryHandler) {
   callbackQueryHandler = handler;
+}
+
+export function setStatusHandler(handler: (chatId: number) => Promise<void>) {
+  statusHandler = handler;
 }
 
 export function setRestartHandler(handler: () => Promise<void>) {
@@ -441,6 +466,127 @@ export async function sendPhoto(chatId: number, photoPath: string, caption?: str
   } catch (err) {
     log.error({ err, chatId, photoPath }, "Failed to send photo");
     throw err;
+  }
+}
+
+export async function sendDocument(chatId: number, filePath: string, caption?: string): Promise<number> {
+  if (!bot) throw new Error("Bot not initialized");
+  try {
+    const msg = await bot.api.sendDocument(chatId, new InputFile(filePath), {
+      ...(caption ? { caption } : {}),
+    });
+    return msg.message_id;
+  } catch (err) {
+    log.error({ err, chatId, filePath }, "Failed to send document");
+    throw err;
+  }
+}
+
+// --- Inline keyboard helpers ---
+
+function buildInlineKeyboard(buttons: TelegramButton[][]): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+  for (const row of buttons) {
+    for (const btn of row) {
+      if (btn.url) {
+        keyboard.url(btn.text, btn.url);
+      } else if (btn.callbackData) {
+        keyboard.text(btn.text, btn.callbackData);
+        if (btn.style) keyboard.style(btn.style);
+      }
+    }
+    keyboard.row();
+  }
+  return keyboard;
+}
+
+/**
+ * Send a message with inline keyboard buttons.
+ */
+export async function sendMessageWithButtons(
+  chatId: number,
+  text: string,
+  buttons: TelegramButton[][],
+  options?: { html?: boolean },
+): Promise<number> {
+  if (!bot) throw new Error("Bot not initialized");
+
+  const keyboard = buildInlineKeyboard(buttons);
+  const htmlText = options?.html ? text : markdownToTelegramHtml(text);
+
+  try {
+    const msg = await bot.api.sendMessage(chatId, htmlText, {
+      parse_mode: "HTML",
+      reply_markup: keyboard,
+    });
+    return msg.message_id;
+  } catch {
+    // Fallback: plain text + keyboard
+    try {
+      const plainText = stripHtmlTags(htmlText);
+      const msg = await bot.api.sendMessage(chatId, plainText, {
+        reply_markup: keyboard,
+      });
+      return msg.message_id;
+    } catch (err) {
+      log.error({ err, chatId, text: text.slice(0, 100) }, "Failed to send message with buttons");
+      throw err;
+    }
+  }
+}
+
+/**
+ * Edit an existing message's text and inline keyboard in-place.
+ */
+export async function editMessageWithButtons(
+  chatId: number,
+  messageId: number,
+  text: string,
+  buttons: TelegramButton[][],
+  options?: { html?: boolean },
+): Promise<void> {
+  if (!bot) throw new Error("Bot not initialized");
+
+  const keyboard = buildInlineKeyboard(buttons);
+  const htmlText = options?.html ? text : markdownToTelegramHtml(text);
+
+  try {
+    await bot.api.editMessageText(chatId, messageId, htmlText, {
+      parse_mode: "HTML",
+      reply_markup: keyboard,
+    });
+  } catch {
+    try {
+      const plainText = stripHtmlTags(htmlText);
+      await bot.api.editMessageText(chatId, messageId, plainText, {
+        reply_markup: keyboard,
+      });
+    } catch (err) {
+      log.error({ err, chatId, messageId }, "Failed to edit message with buttons");
+      throw err;
+    }
+  }
+}
+
+/**
+ * Update only the inline keyboard on an existing message (no text change).
+ * Pass empty array to remove buttons.
+ */
+export async function editMessageButtons(
+  chatId: number,
+  messageId: number,
+  buttons: TelegramButton[][],
+): Promise<void> {
+  if (!bot) throw new Error("Bot not initialized");
+
+  try {
+    const keyboard = buttons.length > 0 ? buildInlineKeyboard(buttons) : undefined;
+    await bot.api.editMessageReplyMarkup(chatId, messageId, {
+      reply_markup: keyboard,
+    });
+  } catch (err) {
+    log.error({ err, chatId, messageId }, "Failed to edit message buttons");
+    // Don't throw — removing buttons is non-critical
   }
 }
 

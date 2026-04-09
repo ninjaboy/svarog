@@ -23,6 +23,7 @@ import {
 } from "../db/queries.js";
 import { WorkerState } from "../types/index.js";
 import type { AskUserQuestionItem } from "../types/index.js";
+import type { TelegramButton } from "../telegram/index.js";
 import { createChildLogger } from "../utils/logger.js";
 import { buildCleanEnv } from "../utils/env.js";
 import { workerLabel } from "../utils/worker-label.js";
@@ -223,6 +224,27 @@ export interface WorkerTelegramContext {
   ) => Promise<number>;
   /** Send a photo to Telegram */
   sendPhoto: (chatId: number, photoPath: string, caption?: string) => Promise<number>;
+  /** Send a message with inline keyboard buttons */
+  sendMessageWithButtons: (
+    chatId: number,
+    text: string,
+    buttons: TelegramButton[][],
+    options?: { html?: boolean },
+  ) => Promise<number>;
+  /** Edit existing message text + buttons in-place */
+  editMessageWithButtons: (
+    chatId: number,
+    messageId: number,
+    text: string,
+    buttons: TelegramButton[][],
+    options?: { html?: boolean },
+  ) => Promise<void>;
+  /** Edit only buttons on existing message */
+  editMessageButtons: (
+    chatId: number,
+    messageId: number,
+    buttons: TelegramButton[][],
+  ) => Promise<void>;
   /** Track which worker sent which Telegram message (for reply routing) */
   trackMessage: (telegramMsgId: number, workerId: number) => void;
 }
@@ -253,6 +275,9 @@ export class WorkerLLM {
 
   /** In-memory question resolvers (keyed by questionId) */
   private questionResolvers = new Map<number, (answer: string) => void>();
+
+  /** Option labels for questions with inline buttons (keyed by questionId) */
+  private questionOptions = new Map<number, string[]>();
 
   /** Plan review resolver (only one at a time) */
   private planResolver: ((decision: string) => void) | null = null;
@@ -389,10 +414,18 @@ export class WorkerLLM {
       answerQuestion(questionId, answer);
       resolver(answer);
       this.questionResolvers.delete(questionId);
+      this.questionOptions.delete(questionId);
       log.info({ questionId, answer, workerId: this.id }, "Question resolved");
       return true;
     }
     return false;
+  }
+
+  /** Resolve a question by option index (from inline keyboard callback) */
+  resolveQuestionByOptionIndex(questionId: number, optionIndex: number): boolean {
+    const labels = this.questionOptions.get(questionId);
+    if (!labels || optionIndex >= labels.length) return false;
+    return this.resolveQuestion(questionId, labels[optionIndex]);
   }
 
   /** Resolve a pending plan review */
@@ -446,15 +479,53 @@ export class WorkerLLM {
         // Format question via Haiku for clean Telegram presentation
         const formattedText = await this.callHaiku(JSON.stringify(input), QUESTION_INSTRUCTION, parsed.text, "question formatter");
 
-        // Send question directly to Telegram (plain text, no buttons)
-        const telegramMsgId = await this.telegramCtx.sendQuestionMessage(
-          this.telegramCtx.chatId,
-          this.id,
-          questionRow.id,
-          formattedText,
-          this.telegramCtx.emoji,
-          this.label,
-        );
+        // Check if question has selectable options → render inline keyboard buttons
+        const allOptions = parsed.questions.flatMap((q) => q.options);
+        let telegramMsgId: number;
+
+        if (allOptions.length > 0) {
+          // Build inline keyboard buttons for options
+          const buttons: TelegramButton[][] = [];
+          const optionLabels: string[] = [];
+
+          if (allOptions.length <= 3) {
+            // Compact: all options in one row
+            const row: TelegramButton[] = [];
+            for (let i = 0; i < allOptions.length; i++) {
+              row.push({ text: allOptions[i].label, callbackData: `q:${questionRow.id}:${i}` });
+              optionLabels.push(allOptions[i].label);
+            }
+            buttons.push(row);
+          } else {
+            // One button per row for 4+ options
+            for (let i = 0; i < allOptions.length; i++) {
+              buttons.push([{ text: allOptions[i].label, callbackData: `q:${questionRow.id}:${i}` }]);
+              optionLabels.push(allOptions[i].label);
+            }
+          }
+
+          this.questionOptions.set(questionRow.id, optionLabels);
+
+          const emojiPrefix = this.telegramCtx.emoji ? `${this.telegramCtx.emoji} ` : '';
+          const questionHtml = `${emojiPrefix}<b>${this.label} asks:</b>\n\n${formattedText}`;
+
+          telegramMsgId = await this.telegramCtx.sendMessageWithButtons(
+            this.telegramCtx.chatId,
+            questionHtml,
+            buttons,
+            { html: true },
+          );
+        } else {
+          // No options — existing plain text path
+          telegramMsgId = await this.telegramCtx.sendQuestionMessage(
+            this.telegramCtx.chatId,
+            this.id,
+            questionRow.id,
+            formattedText,
+            this.telegramCtx.emoji,
+            this.label,
+          );
+        }
 
         // Track message for reply routing
         updateQuestionTelegramMessageId(questionRow.id, telegramMsgId);
@@ -526,12 +597,24 @@ export class WorkerLLM {
         } else {
           // First plan: format and send normally
           const formattedPlan = await this.callHaiku(rawPlan, PLAN_INSTRUCTION, rawPlan, "plan formatter");
-          const planText = `${this.telegramCtx.emoji} ${this.label} submitted a plan:\n\n${formattedPlan}\n\nReply "approve" to proceed or "reject" with feedback.`;
+          const planText = `${this.telegramCtx.emoji} ${this.label} submitted a plan:\n\n${formattedPlan}`;
           const msgIds = await this.telegramCtx.sendLongMessage(this.telegramCtx.chatId, planText);
           for (const mid of msgIds) {
             this.telegramCtx.trackMessage(mid, this.id);
           }
         }
+
+        // Send approve/reject buttons
+        const planButtons: TelegramButton[][] = [[
+          { text: "✅ Approve", callbackData: `p:${this.id}:a`, style: 'success' },
+          { text: "❌ Reject", callbackData: `p:${this.id}:r`, style: 'danger' },
+        ]];
+        const btnMsgId = await this.telegramCtx.sendMessageWithButtons(
+          this.telegramCtx.chatId,
+          "Approve or reject the plan? You can also reply with text feedback.",
+          planButtons,
+        );
+        this.telegramCtx.trackMessage(btnMsgId, this.id);
 
         // Wait for user to approve/reject
         const decision = await new Promise<string>((resolve) => {

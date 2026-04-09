@@ -31,11 +31,29 @@ export interface RegisteredIntent {
   planMode: boolean;
 }
 
+import type { TelegramButton } from "../telegram/index.js";
+import type { ScreenStore } from "../telegram/screen-store.js";
+
 interface McpContext {
   chatId: number;
   intents: RegisteredIntent[];
   sendMessage: (chatId: number, text: string) => Promise<void>;
   sendPhoto: (chatId: number, photoPath: string, caption?: string) => Promise<void>;
+  sendDocument: (chatId: number, filePath: string, caption?: string) => Promise<void>;
+  sendMessageWithButtons: (
+    chatId: number,
+    text: string,
+    buttons: TelegramButton[][],
+    options?: { html?: boolean },
+  ) => Promise<number>;
+}
+
+// --- Screen store ref (set once at startup from index.ts) ---
+
+let screenStoreRef: ScreenStore | null = null;
+
+export function setScreenStore(store: ScreenStore): void {
+  screenStoreRef = store;
 }
 
 let currentCtx: McpContext | null = null;
@@ -124,6 +142,31 @@ const sendTelegramPhotoTool = tool(
       const msg = err instanceof Error ? err.message : String(err);
       log.error({ err }, "send_telegram_photo failed");
       return { content: [{ type: "text" as const, text: `Error sending photo: ${msg}` }] };
+    }
+  }
+);
+
+const sendTelegramDocumentTool = tool(
+  "send_telegram_document",
+  "Send a document/file to the user in Telegram. Use this to send any file (PDF, ZIP, text files, etc.). The file must be a local file path.",
+  {
+    file_path: z.string().describe("Absolute path to the file on disk"),
+    caption: z.string().optional().describe("Optional caption for the document"),
+  },
+  async (args) => {
+    if (!currentCtx) {
+      return { content: [{ type: "text" as const, text: "Error: no active context" }] };
+    }
+    if (!args.file_path || args.file_path.trim() === "") {
+      return { content: [{ type: "text" as const, text: "Error: file_path cannot be empty" }] };
+    }
+    try {
+      await currentCtx.sendDocument(currentCtx.chatId, args.file_path, args.caption);
+      return { content: [{ type: "text" as const, text: "Document sent successfully" }] };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error({ err }, "send_telegram_document failed");
+      return { content: [{ type: "text" as const, text: `Error sending document: ${msg}` }] };
     }
   }
 );
@@ -458,9 +501,88 @@ const manageScheduleTool = tool(
   }
 );
 
+const sendTelegramInteractiveTool = tool(
+  "send_telegram_interactive",
+  "Send an interactive message with inline keyboard buttons to Telegram. Supports callback buttons, URL buttons, and navigation screens. " +
+  "Use for: multiple-choice questions, navigation menus, drill-down into topics, confirmations. " +
+  "Buttons with 'data' field become callback buttons — when pressed, the callback data is sent back to you as '[BUTTON: <data>]'. " +
+  "Buttons with 'url' field open a link. " +
+  "If you provide 'screens', they enable in-place navigation — when user presses a button whose 'data' matches a screen key, the message updates to show that screen's content.",
+  {
+    text: z.string().describe("Message text (supports markdown)"),
+    buttons: z.array(z.array(z.object({
+      text: z.string().describe("Button label"),
+      data: z.string().optional().describe("Callback data (for callback buttons). Max 60 chars."),
+      url: z.string().optional().describe("URL to open (for URL buttons)"),
+      style: z.enum(["danger", "success", "primary"]).optional().describe("Button color"),
+    }))).describe("2D array of buttons (rows of buttons)"),
+    screens: z.record(z.string(), z.object({
+      text: z.string().describe("Screen text content"),
+      buttons: z.array(z.array(z.object({
+        text: z.string(),
+        data: z.string().optional(),
+        url: z.string().optional(),
+        style: z.enum(["danger", "success", "primary"]).optional(),
+      }))).describe("Screen buttons"),
+    })).optional().describe("Optional navigation screens: key → {text, buttons}. When a button's data matches a screen key, the message updates in-place."),
+  },
+  async (args) => {
+    if (!currentCtx) {
+      return { content: [{ type: "text" as const, text: "Error: no active context" }] };
+    }
+
+    try {
+      // Register screens if provided
+      if (args.screens && screenStoreRef) {
+        for (const [key, screen] of Object.entries(args.screens)) {
+          // Convert screen buttons to TelegramButton format
+          const tgButtons: TelegramButton[][] = screen.buttons.map((row) =>
+            row.map((btn) => {
+              // Check if data matches a screen key — use nav: prefix
+              if (btn.data && args.screens && btn.data in args.screens) {
+                return { text: btn.text, callbackData: `nav:${btn.data}`, style: btn.style } as TelegramButton;
+              }
+              return {
+                text: btn.text,
+                callbackData: btn.data ? `s:${btn.data}` : undefined,
+                url: btn.url,
+                style: btn.style,
+              } as TelegramButton;
+            })
+          );
+          screenStoreRef.set(key, { text: screen.text, buttons: tgButtons });
+        }
+      }
+
+      // Convert main buttons to TelegramButton format
+      const tgButtons: TelegramButton[][] = args.buttons.map((row) =>
+        row.map((btn) => {
+          // Check if data matches a screen key — use nav: prefix
+          if (btn.data && args.screens && btn.data in args.screens) {
+            return { text: btn.text, callbackData: `nav:${btn.data}`, style: btn.style } as TelegramButton;
+          }
+          return {
+            text: btn.text,
+            callbackData: btn.data ? `s:${btn.data}` : undefined,
+            url: btn.url,
+            style: btn.style,
+          } as TelegramButton;
+        })
+      );
+
+      await currentCtx.sendMessageWithButtons(currentCtx.chatId, args.text, tgButtons);
+      return { content: [{ type: "text" as const, text: "Interactive message sent successfully" }] };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error({ err }, "send_telegram_interactive failed");
+      return { content: [{ type: "text" as const, text: `Error: ${msg}` }] };
+    }
+  }
+);
+
 // --- MCP server ---
 
 export const svarogMcpServer = createSdkMcpServer({
   name: "svarog",
-  tools: [sendTelegramMessageTool, sendTelegramPhotoTool, registerIntentTool, getSystemStateTool, manageScheduleTool],
+  tools: [sendTelegramMessageTool, sendTelegramPhotoTool, sendTelegramDocumentTool, sendTelegramInteractiveTool, registerIntentTool, getSystemStateTool, manageScheduleTool],
 });

@@ -1,5 +1,6 @@
 import { insertIntent } from "../db/queries.js";
 import type { ClassifiedIntent } from "../types/index.js";
+import type { TelegramButton } from "../telegram/index.js";
 import { SvarogSession } from "./session.js";
 import type { ImageData } from "./session.js";
 import { createChildLogger } from "../utils/logger.js";
@@ -46,6 +47,8 @@ export async function processMessage(
   deps: {
     sendMessage: (chatId: number, text: string) => Promise<void>;
     sendPhoto: (chatId: number, photoPath: string, caption?: string) => Promise<void>;
+    sendDocument: (chatId: number, filePath: string, caption?: string) => Promise<void>;
+    sendMessageWithButtons?: (chatId: number, text: string, buttons: TelegramButton[][], options?: { html?: boolean }) => Promise<number>;
     handleIntent: (intent: ClassifiedIntent & { id: number }) => Promise<void>;
   },
 ): Promise<void> {
@@ -65,6 +68,8 @@ export async function processMessage(
     images,
     deps.sendMessage,
     deps.sendPhoto,
+    deps.sendDocument,
+    deps.sendMessageWithButtons,
   );
 
   // Process each registered intent

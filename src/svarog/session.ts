@@ -10,6 +10,7 @@ import {
 import { getSvarogContext } from "../db/queries.js";
 import { buildCleanEnv } from "../utils/env.js";
 import { createChildLogger } from "../utils/logger.js";
+import type { TelegramButton } from "../telegram/index.js";
 import {
   svarogMcpServer,
   setMcpContext,
@@ -69,6 +70,8 @@ export class SvarogSession {
   private defaultChatId: number | null = null;
   private defaultSendMessage: ((chatId: number, text: string) => Promise<void>) | null = null;
   private defaultSendPhoto: ((chatId: number, photoPath: string, caption?: string) => Promise<void>) | null = null;
+  private defaultSendDocument: ((chatId: number, filePath: string, caption?: string) => Promise<void>) | null = null;
+  private defaultSendMessageWithButtons: ((chatId: number, text: string, buttons: TelegramButton[][], options?: { html?: boolean }) => Promise<number>) | null = null;
   private notifyTimer: ReturnType<typeof setTimeout> | null = null;
 
   isAlive(): boolean {
@@ -116,6 +119,8 @@ export class SvarogSession {
     images: ImageData[] = [],
     sendMessageFn: (chatId: number, text: string) => Promise<void>,
     sendPhotoFn: (chatId: number, photoPath: string, caption?: string) => Promise<void>,
+    sendDocumentFn: (chatId: number, filePath: string, caption?: string) => Promise<void>,
+    sendMessageWithButtonsFn?: (chatId: number, text: string, buttons: TelegramButton[][], options?: { html?: boolean }) => Promise<number>,
   ): Promise<RegisteredIntent[]> {
     if (!this.sessionId) {
       throw new Error("Svarog session not initialized");
@@ -129,6 +134,8 @@ export class SvarogSession {
     this.defaultChatId = chatId;
     this.defaultSendMessage = sendMessageFn;
     this.defaultSendPhoto = sendPhotoFn;
+    this.defaultSendDocument = sendDocumentFn;
+    if (sendMessageWithButtonsFn) this.defaultSendMessageWithButtons = sendMessageWithButtonsFn;
 
     this.busy = true;
     try {
@@ -145,10 +152,14 @@ export class SvarogSession {
     chatId: number,
     sendMessageFn: (chatId: number, text: string) => Promise<void>,
     sendPhotoFn: (chatId: number, photoPath: string, caption?: string) => Promise<void>,
+    sendDocumentFn: (chatId: number, filePath: string, caption?: string) => Promise<void>,
+    sendMessageWithButtonsFn?: (chatId: number, text: string, buttons: TelegramButton[][], options?: { html?: boolean }) => Promise<number>,
   ): void {
     this.defaultChatId = chatId;
     this.defaultSendMessage = sendMessageFn;
     this.defaultSendPhoto = sendPhotoFn;
+    this.defaultSendDocument = sendDocumentFn;
+    if (sendMessageWithButtonsFn) this.defaultSendMessageWithButtons = sendMessageWithButtonsFn;
   }
 
   notify(eventText: string): void {
@@ -207,6 +218,8 @@ export class SvarogSession {
       intents: [],
       sendMessage: sendMessageFn,
       sendPhoto: sendPhotoFn ?? (async () => {}),
+      sendDocument: this.defaultSendDocument ?? (async () => {}),
+      sendMessageWithButtons: this.defaultSendMessageWithButtons ?? (async () => 0),
     });
 
     const canUseTool: CanUseTool = async (toolName, _input, _options) => {

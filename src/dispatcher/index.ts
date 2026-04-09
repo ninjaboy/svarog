@@ -23,6 +23,7 @@ import { WorkerState } from "../types/index.js";
 import { createChildLogger } from "../utils/logger.js";
 import { workerLabel } from "../utils/worker-label.js";
 import { WorkerLLM, WorkerPool } from "../worker/index.js";
+import type { TelegramButton } from "../telegram/index.js";
 import type { WorkerTelegramContext } from "../worker/session.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -47,6 +48,24 @@ export interface TelegramFunctions {
     label?: string,
   ) => Promise<number>;
   sendPhoto: (chatId: number, photoPath: string, caption?: string) => Promise<number>;
+  sendMessageWithButtons: (
+    chatId: number,
+    text: string,
+    buttons: TelegramButton[][],
+    options?: { html?: boolean },
+  ) => Promise<number>;
+  editMessageWithButtons: (
+    chatId: number,
+    messageId: number,
+    text: string,
+    buttons: TelegramButton[][],
+    options?: { html?: boolean },
+  ) => Promise<void>;
+  editMessageButtons: (
+    chatId: number,
+    messageId: number,
+    buttons: TelegramButton[][],
+  ) => Promise<void>;
 }
 
 /**
@@ -209,6 +228,9 @@ export class Dispatcher {
       sendLongMessage: this.telegramFns.sendLongMessage,
       sendQuestionMessage: this.telegramFns.sendQuestionMessage,
       sendPhoto: this.telegramFns.sendPhoto,
+      sendMessageWithButtons: this.telegramFns.sendMessageWithButtons,
+      editMessageWithButtons: this.telegramFns.editMessageWithButtons,
+      editMessageButtons: this.telegramFns.editMessageButtons,
       trackMessage: (telegramMsgId, workerId) => {
         messageToWorker.set(telegramMsgId, workerId);
       },
@@ -351,6 +373,17 @@ export class Dispatcher {
       return session.resolvePlan(decision);
     }
     log.warn({ workerId }, "No worker found for plan resolution");
+    return false;
+  }
+
+  /** Resolve a question by option index — called from callback handler */
+  resolveQuestionByOptionIndex(questionId: number, optionIndex: number): boolean {
+    for (const session of this.pool.getAll()) {
+      if (session.hasQuestion(questionId)) {
+        return session.resolveQuestionByOptionIndex(questionId, optionIndex);
+      }
+    }
+    log.warn({ questionId, optionIndex }, "No worker found for question option resolution");
     return false;
   }
 

@@ -38,6 +38,11 @@ export function scanAndRegisterProjects(): number {
   upsertProject("general", generalWorkerDir);
   count++;
 
+  // Register the "news" project for news digest workers
+  const newsWorkerDir = join(process.cwd(), "svarog-workspace", "news-worker");
+  upsertProject("news", newsWorkerDir);
+  count++;
+
   log.info("Registered %d projects from %s", count, dir);
   return count;
 }
